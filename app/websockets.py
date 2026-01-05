@@ -2,7 +2,7 @@
 import asyncio
 from typing import Dict
 from fastapi import WebSocket, status, WebSocketDisconnect
-from .store import store
+from .store_sql import store
 from .schemas import MessageCreate
 
 class ConnectionManager:
@@ -30,16 +30,10 @@ class ConnectionManager:
             await ws.send_json(data)
 
     async def broadcast_to_conversation(self, conv_id: str, data: dict):
-        conv = store.get_conversation(conv_id)
+        # store is async SQLStore, so await the get_conversation call
+        conv = await store.get_conversation(conv_id)
         if not conv:
             return
         member_ids = conv["members"]
-        send_tasks = []
-        for uid in member_ids:
-            ws = self.active.get(uid)
-            if ws:
-                send_tasks.append(asyncio.create_task(ws.send_json(data)))
-        if send_tasks:
-            await asyncio.gather(*send_tasks, return_exceptions=True)
 
 manager = ConnectionManager()
