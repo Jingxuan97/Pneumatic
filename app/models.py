@@ -3,12 +3,15 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 Base = declarative_base()
 
 def gen_uuid():
     return str(uuid.uuid4())
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class User(Base):
     __tablename__ = "users"
@@ -32,4 +35,4 @@ class Message(Base):
     sender_id = sa.Column(sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     conversation_id = sa.Column(sa.String(length=36), sa.ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     content = sa.Column(sa.Text(), nullable=False)
-    created_at = sa.Column(sa.DateTime(timezone=False), nullable=False, default=datetime.utcnow, index=True)
+    created_at = sa.Column(sa.DateTime(timezone=False), nullable=False, default=utc_now, index=True)

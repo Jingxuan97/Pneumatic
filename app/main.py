@@ -86,9 +86,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                 await websocket.send_json({"type": "error", "reason": "unknown type"})
     except WebSocketDisconnect:
         # client disconnected; ensure we remove the connection and exit cleanly
-        await manager.disconnect(user_id)
+        await manager.disconnect(user_id, websocket)
         return
     except Exception:
         # ensure we remove the connection on any other error
-        await manager.disconnect(user_id)
+        await manager.disconnect(user_id, websocket)
         raise

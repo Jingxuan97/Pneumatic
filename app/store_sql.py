@@ -5,19 +5,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import AsyncSessionLocal
 from app.models import User, Conversation, ConversationMember, Message
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 
 class SQLStore:
     def __init__(self):
         pass
 
-    async def _get_session(self) -> AsyncSession:
-        return AsyncSessionLocal()
-
     # Users
     async def create_user(self, username: str) -> Dict[str, str]:
-        async with await self._get_session() as session:
+        async with AsyncSessionLocal() as session:
             u = User(username=username)
             session.add(u)
             await session.commit()
@@ -25,7 +22,7 @@ class SQLStore:
             return {"id": u.id, "username": u.username}
 
     async def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
-        async with await self._get_session() as session:
+        async with AsyncSessionLocal() as session:
             row = await session.get(User, user_id)
             if row:
                 return {"id": row.id, "username": row.username}
@@ -33,7 +30,7 @@ class SQLStore:
 
     # Conversations
     async def create_conversation(self, title: str, member_ids: List[str]) -> Dict[str, Any]:
-        async with await self._get_session() as session:
+        async with AsyncSessionLocal() as session:
             # validate members exist
             q = await session.execute(select(User.id).where(User.id.in_(member_ids)))
             present = {r[0] for r in q.all()}
@@ -54,7 +51,7 @@ class SQLStore:
             return {"id": conv_id, "title": title, "members": member_ids}
 
     async def get_conversation(self, conv_id: str) -> Optional[Dict[str, Any]]:
-        async with await self._get_session() as session:
+        async with AsyncSessionLocal() as session:
             conv = await session.get(Conversation, conv_id)
             if not conv:
                 return None
@@ -69,7 +66,7 @@ class SQLStore:
           - message_id, sender_id, conversation_id, content
         Raises KeyError if conversation missing, PermissionError if sender not member.
         """
-        async with await self._get_session() as session:
+        async with AsyncSessionLocal() as session:
             # validate conversation
             conv = await session.get(Conversation, message_payload.conversation_id)
             if not conv:
@@ -88,7 +85,7 @@ class SQLStore:
                 sender_id=message_payload.sender_id,
                 conversation_id=message_payload.conversation_id,
                 content=message_payload.content,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             session.add(msg)
             try:
@@ -120,7 +117,7 @@ class SQLStore:
             }
 
     async def list_messages(self, conv_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-        async with await self._get_session() as session:
+        async with AsyncSessionLocal() as session:
             q = await session.execute(
                 select(Message).where(Message.conversation_id == conv_id).order_by(Message.created_at.asc()).limit(limit)
             )
