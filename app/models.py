@@ -17,6 +17,7 @@ class User(Base):
     __tablename__ = "users"
     id = sa.Column(sa.String(length=36), primary_key=True, default=gen_uuid)
     username = sa.Column(sa.String(length=150), nullable=False, unique=True)
+    password_hash = sa.Column(sa.String(length=255), nullable=False)
 
 class Conversation(Base):
     __tablename__ = "conversations"

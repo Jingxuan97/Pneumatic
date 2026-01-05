@@ -13,19 +13,37 @@ class SQLStore:
         pass
 
     # Users
-    async def create_user(self, username: str) -> Dict[str, str]:
+    async def create_user(self, username: str, password_hash: str) -> Dict[str, str]:
+        """Create a new user with username and password hash."""
         async with AsyncSessionLocal() as session:
-            u = User(username=username)
+            u = User(username=username, password_hash=password_hash)
             session.add(u)
-            await session.commit()
-            await session.refresh(u)
-            return {"id": u.id, "username": u.username}
+            try:
+                await session.commit()
+                await session.refresh(u)
+                return {"id": u.id, "username": u.username}
+            except IntegrityError:
+                await session.rollback()
+                raise ValueError(f"Username '{username}' already exists")
 
     async def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         async with AsyncSessionLocal() as session:
             row = await session.get(User, user_id)
             if row:
                 return {"id": row.id, "username": row.username}
+            return None
+
+    async def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        """Get user by username, including password hash for verification."""
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(User).where(User.username == username))
+            row = q.scalar_one_or_none()
+            if row:
+                return {
+                    "id": row.id,
+                    "username": row.username,
+                    "password_hash": row.password_hash
+                }
             return None
 
     # Conversations

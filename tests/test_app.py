@@ -8,20 +8,30 @@ client = TestClient(app)
 
 
 def test_create_user_and_conv_and_send_http_message():
-    # create two users
-    r = client.post("/users", json={"username": "alice"})
+    # create two users with authentication
+    r = client.post("/auth/signup", json={"username": "alice", "password": "pass123"})
     assert r.status_code == 201
     alice = r.json()
-    r = client.post("/users", json={"username": "bob"})
+
+    r = client.post("/auth/signup", json={"username": "bob", "password": "pass123"})
     assert r.status_code == 201
     bob = r.json()
 
-    # create conversation
-    r = client.post("/conversations", json={"title": "chat", "member_ids": [alice["id"], bob["id"]]})
+    # login as alice to get token
+    login = client.post("/auth/login", json={"username": "alice", "password": "pass123"})
+    assert login.status_code == 200
+    alice_token = login.json()["access_token"]
+
+    # create conversation (requires auth)
+    r = client.post(
+        "/conversations",
+        json={"title": "chat", "member_ids": [bob["id"]]},
+        headers={"Authorization": f"Bearer {alice_token}"}
+    )
     assert r.status_code == 201
     conv = r.json()
 
-    # send a message via HTTP
+    # send a message via HTTP (requires auth)
     msg_id = str(uuid.uuid4())
     payload = {
         "message_id": msg_id,
@@ -29,29 +39,42 @@ def test_create_user_and_conv_and_send_http_message():
         "conversation_id": conv["id"],
         "content": "hello bob"
     }
-    r = client.post("/messages", json=payload)
+    r = client.post("/messages", json=payload, headers={"Authorization": f"Bearer {alice_token}"})
     assert r.status_code == 201
     saved = r.json()
     assert saved["content"] == "hello bob"
 
-    # fetching messages
-    r = client.get(f"/conversations/{conv['id']}/messages")
+    # fetching messages (requires auth)
+    r = client.get(f"/conversations/{conv['id']}/messages", headers={"Authorization": f"Bearer {alice_token}"})
     assert r.status_code == 200
     messages = r.json()["messages"]
     assert any(m["message_id"] == msg_id for m in messages)
 
 
 def test_websocket_send_and_receive():
-    # create users & conv
-    r = client.post("/users", json={"username": "w1"})
+    # create users with authentication
+    r = client.post("/auth/signup", json={"username": "w1", "password": "pass123"})
     u1 = r.json()
-    r = client.post("/users", json={"username": "w2"})
+    r = client.post("/auth/signup", json={"username": "w2", "password": "pass123"})
     u2 = r.json()
-    r = client.post("/conversations", json={"title": "ws", "member_ids": [u1["id"], u2["id"]]})
+
+    # login to get tokens
+    login1 = client.post("/auth/login", json={"username": "w1", "password": "pass123"})
+    token1 = login1.json()["access_token"]
+
+    login2 = client.post("/auth/login", json={"username": "w2", "password": "pass123"})
+    token2 = login2.json()["access_token"]
+
+    # create conversation (requires auth)
+    r = client.post(
+        "/conversations",
+        json={"title": "ws", "member_ids": [u2["id"]]},
+        headers={"Authorization": f"Bearer {token1}"}
+    )
     conv = r.json()
 
-    # connect websockets for both users
-    with client.websocket_connect(f"/ws/{u1['id']}") as ws1, client.websocket_connect(f"/ws/{u2['id']}") as ws2:
+    # connect websockets with tokens
+    with client.websocket_connect(f"/ws?token={token1}") as ws1, client.websocket_connect(f"/ws?token={token2}") as ws2:
         # join
         ws1.send_json({"type": "join", "conversation_id": conv["id"]})
         data = ws1.receive_json()

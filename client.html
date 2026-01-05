@@ -1,47 +1,228 @@
-<!-- client.html -->
+<!-- client.html - Updated with Authentication -->
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>Chat client</title></head>
+<head>
+  <meta charset="utf-8">
+  <title>Secure Chat Client</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+    .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    input, button { padding: 8px; margin: 5px; }
+    button { cursor: pointer; }
+    #log { height: 300px; overflow: auto; border: 1px solid #ccc; padding: 10px; background: #f5f5f5; font-family: monospace; font-size: 12px; }
+    .error { color: red; }
+    .success { color: green; }
+  </style>
+</head>
 <body>
-<h3>Minimal Chat Client</h3>
-<label>User ID: <input id="userId" /></label>
-<button id="connectBtn">Connect</button>
-<div>
-  <label>Conversation ID: <input id="convId" /></label>
-  <button id="joinBtn">Join</button>
-</div>
-<div>
-  <input id="msg" placeholder="message"/>
-  <button id="sendBtn">Send</button>
-</div>
-<pre id="log" style="height:300px; overflow:auto; border:1px solid #ccc;"></pre>
+  <h2>Secure Chat Client (with Authentication)</h2>
+
+  <!-- Authentication Section -->
+  <div class="section">
+    <h3>1. Authentication</h3>
+    <div>
+      <label>Username: <input id="username" placeholder="alice" /></label>
+      <label>Password: <input type="password" id="password" placeholder="password" /></label>
+      <button id="signupBtn">Sign Up</button>
+      <button id="loginBtn">Login</button>
+    </div>
+    <div id="authStatus"></div>
+  </div>
+
+  <!-- WebSocket Connection Section -->
+  <div class="section">
+    <h3>2. WebSocket Connection</h3>
+    <button id="connectBtn" disabled>Connect WebSocket</button>
+    <div id="wsStatus"></div>
+  </div>
+
+  <!-- Conversation Section -->
+  <div class="section">
+    <h3>3. Conversation</h3>
+    <div>
+      <label>Conversation ID: <input id="convId" placeholder="conversation-id" /></label>
+      <button id="joinBtn" disabled>Join</button>
+    </div>
+  </div>
+
+  <!-- Messaging Section -->
+  <div class="section">
+    <h3>4. Send Message</h3>
+    <div>
+      <input id="msg" placeholder="Type your message..." style="width: 300px;" />
+      <button id="sendBtn" disabled>Send</button>
+    </div>
+  </div>
+
+  <!-- Log Section -->
+  <div class="section">
+    <h3>Log</h3>
+    <pre id="log"></pre>
+  </div>
 
 <script>
-let ws;
-function log(s) {
+const API_BASE = 'http://localhost:8000';
+let accessToken = null;
+let ws = null;
+
+function log(s, className = '') {
   const p = document.getElementById('log');
-  p.textContent += s + "\n";
+  const line = document.createElement('div');
+  line.className = className;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${s}`;
+  p.appendChild(line);
   p.scrollTop = p.scrollHeight;
 }
-document.getElementById('connectBtn').onclick = async () => {
-  const uid = document.getElementById('userId').value.trim();
-  if (!uid) { alert('enter user id'); return; }
-  ws = new WebSocket(`ws://localhost:8000/ws/${uid}`);
-  ws.onopen = () => log('WS open');
-  ws.onmessage = (ev) => {
-    log('[recv] ' + ev.data);
-  };
-  ws.onclose = () => log('WS closed');
+
+function updateAuthStatus(message, isError = false) {
+  const status = document.getElementById('authStatus');
+  status.innerHTML = `<span class="${isError ? 'error' : 'success'}">${message}</span>`;
+}
+
+function updateWSStatus(message, isError = false) {
+  const status = document.getElementById('wsStatus');
+  status.innerHTML = `<span class="${isError ? 'error' : 'success'}">${message}</span>`;
+}
+
+// Sign Up
+document.getElementById('signupBtn').onclick = async () => {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (!username || !password) {
+    updateAuthStatus('Please enter username and password', true);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      log(`✓ Signed up: ${data.username} (ID: ${data.id})`, 'success');
+      updateAuthStatus(`Signed up as ${data.username}`);
+    } else {
+      log(`✗ Signup failed: ${data.detail}`, 'error');
+      updateAuthStatus(data.detail, true);
+    }
+  } catch (error) {
+    log(`✗ Signup error: ${error.message}`, 'error');
+    updateAuthStatus('Signup failed', true);
+  }
 };
+
+// Login
+document.getElementById('loginBtn').onclick = async () => {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (!username || !password) {
+    updateAuthStatus('Please enter username and password', true);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      accessToken = data.access_token;
+      log(`✓ Logged in: ${username}`, 'success');
+      log(`  Access token: ${accessToken.substring(0, 20)}...`, 'success');
+      updateAuthStatus(`Logged in as ${username}`);
+      document.getElementById('connectBtn').disabled = false;
+    } else {
+      log(`✗ Login failed: ${data.detail}`, 'error');
+      updateAuthStatus(data.detail, true);
+    }
+  } catch (error) {
+    log(`✗ Login error: ${error.message}`, 'error');
+    updateAuthStatus('Login failed', true);
+  }
+};
+
+// Connect WebSocket
+document.getElementById('connectBtn').onclick = () => {
+  if (!accessToken) {
+    updateWSStatus('Please login first', true);
+    return;
+  }
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    log('Already connected', 'error');
+    return;
+  }
+
+  // Connect with token in query parameter
+  ws = new WebSocket(`ws://localhost:8000/ws?token=${accessToken}`);
+
+  ws.onopen = () => {
+    log('✓ WebSocket connected', 'success');
+    updateWSStatus('Connected');
+    document.getElementById('joinBtn').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+  };
+
+  ws.onmessage = (ev) => {
+    const data = JSON.parse(ev.data);
+    log(`[recv] ${JSON.stringify(data, null, 2)}`);
+  };
+
+  ws.onerror = (error) => {
+    log(`✗ WebSocket error: ${error}`, 'error');
+    updateWSStatus('Connection error', true);
+  };
+
+  ws.onclose = () => {
+    log('WebSocket closed', 'error');
+    updateWSStatus('Disconnected', true);
+    document.getElementById('joinBtn').disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+  };
+};
+
+// Join Conversation
 document.getElementById('joinBtn').onclick = () => {
   const conv = document.getElementById('convId').value.trim();
-  if (!ws) { alert('not connected'); return; }
-  ws.send(JSON.stringify({type:'join', conversation_id: conv}));
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    alert('Not connected');
+    return;
+  }
+  if (!conv) {
+    alert('Enter conversation ID');
+    return;
+  }
+  ws.send(JSON.stringify({ type: 'join', conversation_id: conv }));
+  log(`[sent] join conversation: ${conv}`);
 };
+
+// Send Message
 document.getElementById('sendBtn').onclick = () => {
   const conv = document.getElementById('convId').value.trim();
-  const txt = document.getElementById('msg').value;
-  if (!ws) { alert('not connected'); return; }
+  const txt = document.getElementById('msg').value.trim();
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    alert('Not connected');
+    return;
+  }
+  if (!conv) {
+    alert('Enter conversation ID');
+    return;
+  }
+  if (!txt) {
+    alert('Enter message');
+    return;
+  }
+
   const message_id = crypto.randomUUID();
   const payload = {
     type: 'message',
@@ -50,7 +231,8 @@ document.getElementById('sendBtn').onclick = () => {
     content: txt
   };
   ws.send(JSON.stringify(payload));
-  log('[sent] ' + JSON.stringify(payload));
+  log(`[sent] ${JSON.stringify(payload)}`);
+  document.getElementById('msg').value = '';
 };
 </script>
 </body>

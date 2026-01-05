@@ -1,9 +1,26 @@
 # app/schemas.py
-from typing import List, Any
-from pydantic import BaseModel
+from typing import List, Any, Optional
+from pydantic import BaseModel, EmailStr
 
 class UserCreate(BaseModel):
     username: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+class TokenRefresh(BaseModel):
+    refresh_token: str
 
 class ConversationCreate(BaseModel):
     title: str
