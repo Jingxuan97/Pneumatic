@@ -1,0 +1,57 @@
+<!-- client.html -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Chat client</title></head>
+<body>
+<h3>Minimal Chat Client</h3>
+<label>User ID: <input id="userId" /></label>
+<button id="connectBtn">Connect</button>
+<div>
+  <label>Conversation ID: <input id="convId" /></label>
+  <button id="joinBtn">Join</button>
+</div>
+<div>
+  <input id="msg" placeholder="message"/>
+  <button id="sendBtn">Send</button>
+</div>
+<pre id="log" style="height:300px; overflow:auto; border:1px solid #ccc;"></pre>
+
+<script>
+let ws;
+function log(s) {
+  const p = document.getElementById('log');
+  p.textContent += s + "\n";
+  p.scrollTop = p.scrollHeight;
+}
+document.getElementById('connectBtn').onclick = async () => {
+  const uid = document.getElementById('userId').value.trim();
+  if (!uid) { alert('enter user id'); return; }
+  ws = new WebSocket(`ws://localhost:8000/ws/${uid}`);
+  ws.onopen = () => log('WS open');
+  ws.onmessage = (ev) => {
+    log('[recv] ' + ev.data);
+  };
+  ws.onclose = () => log('WS closed');
+};
+document.getElementById('joinBtn').onclick = () => {
+  const conv = document.getElementById('convId').value.trim();
+  if (!ws) { alert('not connected'); return; }
+  ws.send(JSON.stringify({type:'join', conversation_id: conv}));
+};
+document.getElementById('sendBtn').onclick = () => {
+  const conv = document.getElementById('convId').value.trim();
+  const txt = document.getElementById('msg').value;
+  if (!ws) { alert('not connected'); return; }
+  const message_id = crypto.randomUUID();
+  const payload = {
+    type: 'message',
+    message_id,
+    conversation_id: conv,
+    content: txt
+  };
+  ws.send(JSON.stringify(payload));
+  log('[sent] ' + JSON.stringify(payload));
+};
+</script>
+</body>
+</html>
