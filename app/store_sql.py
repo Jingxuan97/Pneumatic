@@ -13,15 +13,15 @@ class SQLStore:
         pass
 
     # Users
-    async def create_user(self, username: str, password_hash: str) -> Dict[str, str]:
-        """Create a new user with username and password hash."""
+    async def create_user(self, username: str, password_hash: str, full_name: str | None = None) -> Dict[str, str]:
+        """Create a new user with username, password hash, and optional full name."""
         async with AsyncSessionLocal() as session:
-            u = User(username=username, password_hash=password_hash)
+            u = User(username=username, password_hash=password_hash, full_name=full_name)
             session.add(u)
             try:
                 await session.commit()
                 await session.refresh(u)
-                return {"id": u.id, "username": u.username}
+                return {"id": u.id, "username": u.username, "full_name": u.full_name}
             except IntegrityError:
                 await session.rollback()
                 raise ValueError(f"Username '{username}' already exists")
@@ -30,7 +30,7 @@ class SQLStore:
         async with AsyncSessionLocal() as session:
             row = await session.get(User, user_id)
             if row:
-                return {"id": row.id, "username": row.username}
+                return {"id": row.id, "username": row.username, "full_name": row.full_name}
             return None
 
     async def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
@@ -42,8 +42,75 @@ class SQLStore:
                 return {
                     "id": row.id,
                     "username": row.username,
+                    "full_name": row.full_name,
                     "password_hash": row.password_hash
                 }
+            return None
+
+    async def list_all_users(self, exclude_user_id: str | None = None) -> List[Dict[str, Any]]:
+        """Get all users, optionally excluding a specific user."""
+        async with AsyncSessionLocal() as session:
+            query = select(User)
+            if exclude_user_id:
+                query = query.where(User.id != exclude_user_id)
+            q = await session.execute(query.order_by(User.username))
+            rows = q.scalars().all()
+            return [
+                {
+                    "id": row.id,
+                    "username": row.username,
+                    "full_name": row.full_name
+                }
+                for row in rows
+            ]
+
+    async def find_one_on_one_conversation(self, user1_id: str, user2_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Find an existing 1-on-1 conversation between two users.
+        Returns None if no such conversation exists.
+        """
+        async with AsyncSessionLocal() as session:
+            # Find conversations where both users are members
+            # This query finds conversations that have exactly these two members
+
+            # Get all conversations where user1 is a member
+            q1 = await session.execute(
+                select(ConversationMember.conversation_id)
+                .where(ConversationMember.user_id == user1_id)
+            )
+            user1_conv_ids = {r[0] for r in q1.all()}
+
+            if not user1_conv_ids:
+                return None
+
+            # Get conversations where user2 is also a member
+            q2 = await session.execute(
+                select(ConversationMember.conversation_id)
+                .where(
+                    ConversationMember.conversation_id.in_(user1_conv_ids),
+                    ConversationMember.user_id == user2_id
+                )
+            )
+            shared_conv_ids = {r[0] for r in q2.all()}
+
+            if not shared_conv_ids:
+                return None
+
+            # Check if any of these conversations have exactly 2 members (1-on-1)
+            for conv_id in shared_conv_ids:
+                q_members = await session.execute(
+                    select(func.count(ConversationMember.user_id))
+                    .where(ConversationMember.conversation_id == conv_id)
+                )
+                member_count = q_members.scalar()
+
+                if member_count == 2:
+                    # Found a 1-on-1 conversation
+                    conv = await session.get(Conversation, conv_id)
+                    if conv:
+                        members = [user1_id, user2_id]
+                        return {"id": conv.id, "title": conv.title, "members": members}
+
             return None
 
     # Conversations
@@ -76,6 +143,41 @@ class SQLStore:
             q = await session.execute(select(ConversationMember.user_id).where(ConversationMember.conversation_id == conv_id))
             members = [r[0] for r in q.all()]
             return {"id": conv.id, "title": conv.title, "members": members}
+
+    async def list_user_conversations(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all conversations for a user."""
+        async with AsyncSessionLocal() as session:
+            # Get all conversation IDs where user is a member
+            q = await session.execute(
+                select(ConversationMember.conversation_id)
+                .where(ConversationMember.user_id == user_id)
+            )
+            conv_ids = [r[0] for r in q.all()]
+
+            if not conv_ids:
+                return []
+
+            # Get conversation details
+            q = await session.execute(
+                select(Conversation).where(Conversation.id.in_(conv_ids))
+            )
+            conversations = q.scalars().all()
+
+            # Get members for each conversation
+            result = []
+            for conv in conversations:
+                q_members = await session.execute(
+                    select(ConversationMember.user_id)
+                    .where(ConversationMember.conversation_id == conv.id)
+                )
+                members = [r[0] for r in q_members.all()]
+                result.append({
+                    "id": conv.id,
+                    "title": conv.title,
+                    "members": members
+                })
+
+            return result
 
     # Messages
     async def save_message(self, message_payload) -> Dict[str, Any]:

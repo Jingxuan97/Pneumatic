@@ -31,7 +31,7 @@ async def signup(user_data: UserCreate):
     # Hash password and create user
     password_hash = get_password_hash(user_data.password)
     try:
-        user = await store.create_user(user_data.username, password_hash)
+        user = await store.create_user(user_data.username, password_hash, user_data.full_name)
         return UserResponse(**user)
     except ValueError as e:
         raise HTTPException(

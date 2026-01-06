@@ -156,7 +156,7 @@ async def get_current_user_websocket(websocket: WebSocket) -> dict:
         if user is None:
             raise WebSocketException(
                 code=status.WS_1008_POLICY_VIOLATION,
-                reason="User not found"
+                reason="User not found. Please log in again (database may have been reset)."
             )
 
         return user

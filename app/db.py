@@ -7,19 +7,16 @@ from app.models import Base
 # Default dev DB is a local sqlite file. In prod set DATABASE_URL env var.
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./dev.db")
 
-# --- DEV SAFETY: if using the default local sqlite dev DB, remove the file
-# on import so tests / dev runs start from a clean database file.
-# After removing it, create tables synchronously so they exist immediately.
+# Ensure tables exist without dropping data
+# Only create tables if they don't exist - preserves existing data
 if DATABASE_URL.startswith("sqlite") and ("./dev.db" in DATABASE_URL or DATABASE_URL.endswith("/dev.db")):
     try:
-        dev_path = "./dev.db"
-        if os.path.exists(dev_path):
-            os.remove(dev_path)
-        # create tables synchronously so tests see them immediately
+        # create tables synchronously so they exist immediately
         # use a sync engine for this one-time bootstrap
         from sqlalchemy import create_engine
         sync_url = "sqlite:///./dev.db"
         sync_engine = create_engine(sync_url, future=True)
+        # create_all only creates tables that don't exist - doesn't drop data
         Base.metadata.create_all(sync_engine)
         sync_engine.dispose()
     except Exception:

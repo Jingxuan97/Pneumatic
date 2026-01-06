@@ -7,8 +7,10 @@ from .auth_routes import router as auth_router
 from .websockets import manager
 from .store_sql import store  # async SQL store
 from .schemas import MessageCreate
-from .db import DATABASE_URL, reset_db
+from .db import DATABASE_URL, init_db
 from .auth import get_current_user_websocket
+from .pubsub import pubsub, presence, RedisPubSub, PresenceManager
+from redis.asyncio import Redis
 
 app = FastAPI(title="Pneumatic Chat - Secure")
 
@@ -27,12 +29,33 @@ app.include_router(router)
 
 @app.on_event("startup")
 async def on_startup():
-    # For local dev using the default sqlite dev DB, reset schema to ensure tests run
-    # against a clean database. Do NOT do this in production.
-    dev_sqlite = DATABASE_URL.startswith("sqlite") and ("./dev.db" in DATABASE_URL or ":memory:" in DATABASE_URL)
-    if dev_sqlite:
-        # careful: this will DROP all tables in the dev DB
-        await reset_db()
+    # Ensure database tables exist (creates if missing, preserves existing data)
+    await init_db()
+
+    # Initialize Redis pub/sub and presence
+    global pubsub, presence
+    try:
+        pubsub = RedisPubSub()
+        await pubsub.connect()
+
+        # Initialize presence manager with Redis connection
+        redis_client = Redis.from_url(pubsub.redis_url, decode_responses=True)
+        presence = PresenceManager(redis_client)
+
+        logger.info("Redis pub/sub and presence initialized")
+    except Exception as e:
+        logger.warning("Failed to initialize Redis (will use local broadcast only): %s", e)
+        pubsub = None
+        presence = None
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    # Disconnect from Redis
+    global pubsub
+    if pubsub:
+        await pubsub.disconnect()
+        logger.info("Disconnected from Redis")
 
 
 import logging
@@ -85,6 +108,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     if user_id not in conv["members"]:
                         await websocket.send_json({"type": "error", "reason": "not a member of this conversation"})
                         continue
+
+                    # Subscribe to conversation channel in Redis
+                    await manager.join_conversation(user_id, conv_id)
 
                     await websocket.send_json({"type": "joined", "conversation_id": conv_id})
                     logger.debug("WS %s joined conv=%s", user_id, conv_id)

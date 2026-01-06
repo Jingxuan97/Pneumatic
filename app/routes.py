@@ -8,6 +8,28 @@ from .auth import get_current_user
 
 router = APIRouter()
 
+@router.get("/users")
+async def list_users(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all registered users (excluding the current user).
+    Requires authentication.
+    """
+    users = await store.list_all_users(exclude_user_id=current_user["id"])
+    return {"users": users}
+
+@router.get("/conversations")
+async def list_conversations(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all conversations for the current user.
+    Requires authentication.
+    """
+    conversations = await store.list_user_conversations(current_user["id"])
+    return {"conversations": conversations}
+
 @router.post("/conversations", status_code=status.HTTP_201_CREATED)
 async def create_conversation(
     c: ConversationCreate,
@@ -16,9 +38,23 @@ async def create_conversation(
     """
     Create a new conversation.
     Requires authentication. The current user is automatically added as a member.
+
+    For 1-on-1 conversations (exactly 2 members), this will return an existing
+    conversation if one already exists between these two users.
     """
     # Ensure current user is included in members
     member_ids = list(set(c.member_ids + [current_user["id"]]))
+
+    # Check if this is a 1-on-1 conversation (exactly 2 members)
+    if len(member_ids) == 2:
+        # Check if a 1-on-1 conversation already exists
+        existing_conv = await store.find_one_on_one_conversation(
+            member_ids[0],
+            member_ids[1]
+        )
+        if existing_conv:
+            # Return existing conversation instead of creating a duplicate
+            return existing_conv
 
     try:
         conv = await store.create_conversation(c.title, member_ids)
