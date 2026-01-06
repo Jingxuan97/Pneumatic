@@ -1,5 +1,7 @@
 # AWS Elastic Beanstalk Deployment Guide
 
+> **For a complete step-by-step guide including database and domain setup, see [AWS_DEPLOYMENT_GUIDE.md](AWS_DEPLOYMENT_GUIDE.md)**
+
 ## Prerequisites
 
 1. **AWS Account** with appropriate permissions
@@ -17,8 +19,10 @@ pip install awsebcli
 
 ```bash
 # In project root
-eb init -p python-3.10 pneumatic-chat --region us-east-1
+eb init -p python-3.11 pneumatic-chat --region us-east-1
 ```
+
+**Note:** Use `python-3.11` or `python-3.12` instead of `python-3.10` as 3.10 may not be available in all regions.
 
 This will:
 - Create `.elasticbeanstalk/` directory
@@ -30,7 +34,7 @@ This will:
 ```bash
 eb create pneumatic-chat-prod \
   --instance-type t3.small \
-  --platform "Python 3.10" \
+  --platform "Python 3.11" \
   --single
 ```
 
@@ -38,10 +42,12 @@ For production with load balancing:
 ```bash
 eb create pneumatic-chat-prod \
   --instance-type t3.small \
-  --platform "Python 3.10" \
+  --platform "Python 3.11" \
   --elb-type application \
   --envvars SECRET_KEY="your-secret-key-here",DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/dbname"
 ```
+
+**Note:** Use `Python 3.11` or `Python 3.12` instead of `Python 3.10` as 3.10 may not be available in all regions.
 
 ## Step 4: Set Environment Variables
 

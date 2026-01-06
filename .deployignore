@@ -1,0 +1,61 @@
+# Files to exclude from deployment package
+# This is similar to .gitignore but specifically for deployment
+
+# Development files
+dev.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# Documentation (optional - remove if you want to include)
+docs/
+*.md
+!README.md
+
+# Examples
+examples/
+
+# Tests
+tests/
+
+# Elastic Beanstalk (already deployed config)
+.elasticbeanstalk/
+
+# AWS
+.aws-sam/

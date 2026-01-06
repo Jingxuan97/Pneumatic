@@ -47,7 +47,8 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS Elastic Beanstalk deploymen
 - **[User Guide](docs/USER_GUIDE.md)** - Complete feature documentation
 - **[Architecture](docs/ARCHITECTURE.md)** - Technical architecture overview
 - **[Authentication](docs/AUTHENTICATION.md)** - Auth implementation details
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - AWS Elastic Beanstalk deployment
+- **[Complete AWS Deployment Guide](docs/AWS_DEPLOYMENT_GUIDE.md)** - Step-by-step deployment with database and domain setup
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Quick reference for AWS Elastic Beanstalk
 - **[Codebase Explanation](docs/CODEBASE_EXPLANATION.md)** - Code understanding guide
 
 ## 🧪 Testing

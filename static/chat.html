@@ -397,8 +397,9 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8000';
-        const WS_BASE = 'ws://localhost:8000';
+        // Auto-detect API base URL (works in both dev and production)
+        const API_BASE = window.location.origin;
+        const WS_BASE = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host;
 
         let accessToken = localStorage.getItem('accessToken');
         let userId = localStorage.getItem('userId');

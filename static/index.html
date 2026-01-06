@@ -244,7 +244,8 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8000';
+        // Auto-detect API base URL (works in both dev and production)
+        const API_BASE = window.location.origin;
 
         function switchTab(tab) {
             // Update tabs
@@ -339,7 +340,7 @@
             } catch (error) {
                 console.error('Signup error:', error);
                 if (error.message && error.message.includes('Failed to fetch')) {
-                    showError('Cannot connect to server. Make sure the server is running at http://localhost:8000');
+                    showError('Cannot connect to server. Please check your connection and try again.');
                 } else {
                     showError('Network error. Please check if the server is running.');
                 }
@@ -390,7 +391,7 @@
             } catch (error) {
                 console.error('Login error:', error);
                 if (error.message && error.message.includes('Failed to fetch')) {
-                    showError('Cannot connect to server. Make sure the server is running at http://localhost:8000');
+                    showError('Cannot connect to server. Please check your connection and try again.');
                 } else {
                     showError('Network error. Please check if the server is running.');
                 }
