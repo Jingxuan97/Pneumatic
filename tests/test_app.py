@@ -15,6 +15,61 @@ def test_root_serves_index():
     assert "Pneumatic Chat" in response.text or "Login" in response.text
 
 
+def test_health_check():
+    """Test health check endpoint"""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+
+
+def test_readiness_check():
+    """Test readiness check endpoint"""
+    response = client.get("/ready")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ready"
+
+
+def test_metrics_endpoint():
+    """Test Prometheus metrics endpoint"""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    # FastAPI adds charset automatically, so check if it starts with text/plain
+    assert response.headers["content-type"].startswith("text/plain")
+
+    metrics_text = response.text
+    # Check for expected metrics
+    assert "pneumatic_websocket_connections_total" in metrics_text
+    assert "pneumatic_websocket_connections_active" in metrics_text
+    assert "pneumatic_messages_sent_total" in metrics_text
+    assert "pneumatic_messages_per_second" in metrics_text
+    # Check Prometheus format (has HELP and TYPE comments)
+    assert "# HELP" in metrics_text
+    assert "# TYPE" in metrics_text
+
+
+def test_rate_limiting():
+    """Test rate limiting middleware"""
+    # Test that exempt endpoints don't have rate limit headers
+    health_response = client.get("/health")
+    # Health endpoint is exempt, so it should not have rate limit headers
+    assert health_response.status_code == 200
+    assert "X-RateLimit-Limit" not in health_response.headers
+
+    # Test that non-exempt endpoints have rate limit headers
+    # Use a simple endpoint that's not exempt - try accessing a non-existent API endpoint
+    # This will go through the middleware but return 404
+    response = client.get("/api/nonexistent")
+    # Should have rate limit headers even if endpoint doesn't exist
+    assert "X-RateLimit-Limit" in response.headers
+    assert "X-RateLimit-Remaining" in response.headers
+    assert "X-RateLimit-Reset" in response.headers
+    # Verify the values are reasonable
+    assert int(response.headers["X-RateLimit-Limit"]) > 0
+    assert int(response.headers["X-RateLimit-Remaining"]) >= 0
+
+
 def test_static_files_served():
     """Test that static files are accessible"""
     # Test index.html

@@ -1,10 +1,11 @@
 # app/routes.py
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from .schemas import ConversationCreate, MessageCreate
 from .store_sql import store
 import asyncio
 from .websockets import manager
 from .auth import get_current_user
+from .metrics import metrics
 
 router = APIRouter()
 
@@ -114,4 +115,6 @@ async def post_message(
 
     payload = {"type": "message", "message": saved}
     asyncio.create_task(manager.broadcast_to_conversation(m.conversation_id, payload))
+    # Track message metric
+    metrics.increment_message_sent()
     return saved

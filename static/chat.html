@@ -297,8 +297,15 @@
         }
 
         .modal-content h3 {
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             color: #333;
+        }
+
+        .modal-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
         }
 
         .modal-content input {
@@ -355,7 +362,7 @@
                 <div class="empty-state">Loading users...</div>
             </div>
         </div>
-        <button class="new-conversation-btn" onclick="showNewConversationModal()">+ New Conversation</button>
+        <button class="new-conversation-btn" onclick="showNewConversationModal()">+ New Group Chat</button>
         <div class="conversations-list" id="conversationsList">
             <div class="empty-state">No conversations yet</div>
         </div>
@@ -375,15 +382,16 @@
         </div>
     </div>
 
-    <!-- New Conversation Modal -->
+    <!-- New Group Chat Modal -->
     <div class="modal" id="newConversationModal">
         <div class="modal-content">
-            <h3>New Conversation</h3>
-            <input type="text" id="conversationTitle" placeholder="Conversation title">
-            <input type="text" id="memberUsernames" placeholder="Usernames (comma-separated)">
+            <h3>New Group Chat</h3>
+            <p class="modal-description">Create a group conversation with multiple participants. You will be automatically added as a member.</p>
+            <input type="text" id="conversationTitle" placeholder="Group name (required)" required>
+            <input type="text" id="memberUsernames" placeholder="Add participants by username (comma-separated, e.g., alice, bob)">
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="closeNewConversationModal()">Cancel</button>
-                <button class="modal-btn modal-btn-primary" onclick="createConversation()">Create</button>
+                <button class="modal-btn modal-btn-primary" onclick="createGroupConversation()">Create Group</button>
             </div>
         </div>
     </div>
@@ -615,9 +623,11 @@
                             const isNew = highlightNewId === conv.id || (!previousConvIds.has(conv.id) && highlightNewId === null);
                             const newClass = isNew ? 'new-conversation' : '';
                             const displayName = getConversationDisplayName(conv);
+                            const isGroup = conv.members && conv.members.length > 2;
+                            const groupIcon = isGroup ? '👥 ' : '';
                             return `
                                 <div class="conversation-item ${isActive} ${newClass}" onclick="selectConversation('${conv.id}')">
-                                    <div class="conversation-title">${displayName}${isNew ? ' <span style="color: #667eea; font-size: 0.8em;">(new)</span>' : ''}</div>
+                                    <div class="conversation-title">${groupIcon}${displayName}${isNew ? ' <span style="color: #667eea; font-size: 0.8em;">(new)</span>' : ''}</div>
                                     <div class="conversation-preview">${conv.members.length} member${conv.members.length !== 1 ? 's' : ''}</div>
                                 </div>
                             `;
@@ -658,21 +668,55 @@
             document.getElementById('memberUsernames').value = '';
         }
 
-        async function createConversation() {
+        async function createGroupConversation() {
             const title = document.getElementById('conversationTitle').value.trim();
-            const usernames = document.getElementById('memberUsernames').value.trim();
+            const usernamesInput = document.getElementById('memberUsernames').value.trim();
 
             if (!title) {
-                alert('Please enter a conversation title');
+                alert('Please enter a group name');
                 return;
             }
 
             try {
-                // Get user IDs for usernames (simplified - in real app, you'd have a user search endpoint)
-                const memberIds = [userId]; // Always include current user
+                // Start with current user as a member (host is automatically included by backend)
+                const memberIds = [];
 
-                // For demo, we'll create conversation with just current user
-                // In production, you'd resolve usernames to user IDs
+                // Resolve usernames to user IDs
+                if (usernamesInput) {
+                    const usernames = usernamesInput.split(',').map(u => u.trim()).filter(u => u);
+                    const invalidUsernames = [];
+
+                    for (const inputUsername of usernames) {
+                        // Skip if it's the current user's username
+                        if (inputUsername.toLowerCase() === (username || '').toLowerCase()) {
+                            continue;
+                        }
+
+                        // Find user by username (case-insensitive)
+                        const user = allUsers.find(u =>
+                            u.username.toLowerCase() === inputUsername.toLowerCase()
+                        );
+
+                        if (user) {
+                            // Don't add duplicates
+                            if (!memberIds.includes(user.id)) {
+                                memberIds.push(user.id);
+                            }
+                        } else {
+                            invalidUsernames.push(inputUsername);
+                        }
+                    }
+
+                    if (invalidUsernames.length > 0) {
+                        alert(`Could not find users: ${invalidUsernames.join(', ')}\n\nGroup will be created with valid participants only.`);
+                    }
+                }
+
+                // Ensure we have at least 1 other member (backend will add current user automatically)
+                if (memberIds.length === 0) {
+                    alert('Please add at least one participant to create a group chat.\n\nFor 1-on-1 conversations, click on a user from the Users list.');
+                    return;
+                }
 
                 const response = await fetch(`${API_BASE}/conversations`, {
                     method: 'POST',
@@ -682,24 +726,24 @@
                     },
                     body: JSON.stringify({
                         title,
-                        member_ids: memberIds
+                        member_ids: memberIds // Backend will add current user automatically
                     })
                 });
 
                 if (response.ok) {
                     const conv = await response.json();
-                    await loadConversations();
-                    closeNewConversationModal();
+                    await loadConversations(conv.id);
                     selectConversation(conv.id);
+                    closeNewConversationModal();
                 } else if (handleAuthError(response)) {
                     return; // Redirected to login
                 } else {
                     const error = await response.json();
-                    alert(error.detail || 'Failed to create conversation');
+                    alert(error.detail || 'Failed to create group chat');
                 }
             } catch (error) {
-                console.error('Error creating conversation:', error);
-                alert('Failed to create conversation');
+                console.error('Error creating group conversation:', error);
+                alert('Failed to create group chat');
             }
         }
 

@@ -1,5 +1,5 @@
 # app/auth_routes.py
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from .schemas import UserCreate, UserResponse, UserLogin, Token, TokenRefresh
 from .store_sql import store
 from .auth import (
@@ -124,7 +124,9 @@ async def refresh_token(token_data: TokenRefresh):
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+async def get_current_user_info(
+    current_user: dict = Depends(get_current_user)
+):
     """
     Get current authenticated user information.
     """
