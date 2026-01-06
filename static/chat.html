@@ -794,6 +794,27 @@
             }
         }
 
+        // Helper function to get sender's display name
+        function getSenderName(senderId) {
+            if (senderId === userId) {
+                return fullName || username || 'You';
+            }
+
+            // Check userIdToUserMap first
+            if (userIdToUserMap[senderId]) {
+                const user = userIdToUserMap[senderId];
+                return user.full_name || user.username || 'Unknown';
+            }
+
+            // Check allUsers as fallback
+            const user = allUsers.find(u => u.id === senderId);
+            if (user) {
+                return user.full_name || user.username || 'Unknown';
+            }
+
+            return 'Unknown';
+        }
+
         function displayMessages(messages) {
             const container = document.getElementById('messagesContainer');
             if (messages.length === 0) {
@@ -804,9 +825,10 @@
             container.innerHTML = messages.map(msg => {
                 const isOwn = msg.sender_id === userId;
                 const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const senderName = getSenderName(msg.sender_id);
                 return `
                     <div class="message ${isOwn ? 'own' : 'other'}">
-                        ${!isOwn ? `<div class="message-sender">${userMap[msg.sender_id] || 'User'}</div>` : ''}
+                        ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
                         <div class="message-bubble">${msg.content}</div>
                         <div class="message-time">${time}</div>
                     </div>
@@ -854,11 +876,12 @@
                         const container = document.getElementById('messagesContainer');
                         const isOwn = msg.sender_id === userId;
                         const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const senderName = getSenderName(msg.sender_id);
 
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
                         messageDiv.innerHTML = `
-                            ${!isOwn ? `<div class="message-sender">${userMap[msg.sender_id] || 'User'}</div>` : ''}
+                            ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
                             <div class="message-bubble">${msg.content}</div>
                             <div class="message-time">${time}</div>
                         `;

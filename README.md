@@ -1,56 +1,63 @@
-# Pneumatic Chat - Secure Real-Time Messaging
+# Pneumatic Chat - Production-Ready Real-Time Messaging
 
-A production-ready real-time chat application with JWT authentication and WebSocket messaging.
+A production-ready real-time chat application with JWT authentication, WebSocket messaging, and full observability.
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+### Local Development
 
-### 2. Start the Server
 ```bash
-uvicorn main:app --reload
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export SECRET_KEY="your-secret-key-minimum-32-characters"
+export DATABASE_URL="sqlite+aiosqlite:///./dev.db"  # or PostgreSQL for production
+
+# Start server
+uvicorn app.main:app --reload
 ```
 
 Server runs at: `http://localhost:8000`
 
-### 3. Use the Application
-- **Web UI**: Open `index.html` in your browser
-- **API Docs**: http://localhost:8000/docs
-- **Quick Start Guide**: See `QUICK_START.md`
+### Production Deployment
 
-## 📖 Documentation
-
-- **[Quick Start Guide](QUICK_START.md)** - Get started in 5 minutes
-- **[User Guide](USER_GUIDE.md)** - Complete feature documentation
-- **[Architecture](ARCHITECTURE.md)** - Technical architecture overview
-- **[Authentication](AUTHENTICATION.md)** - Auth implementation details
-- **[Testing Guide](TESTING_GUIDE.md)** - How to test features
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS Elastic Beanstalk deployment instructions.
 
 ## ✨ Features
 
 ### Core Features
 - ✅ **JWT Authentication** - Secure token-based auth with refresh tokens
 - ✅ **Real-time Messaging** - WebSocket-based instant messaging
-- ✅ **Multiple Conversations** - Create and manage multiple chat rooms
+- ✅ **1-on-1 & Group Chats** - Private conversations and group conversations
 - ✅ **Secure Passwords** - Argon2 password hashing
 - ✅ **Modern UI/UX** - Beautiful, responsive web interface
+- ✅ **Multiple Devices** - Connect from multiple devices simultaneously
 
-### Advanced Features
-- ✅ **Message Idempotency** - Prevent duplicate messages
-- ✅ **Multiple Devices** - Connect from phone, laptop, tablet simultaneously
-- ✅ **Permission Checks** - Conversation membership validation
+### Production Features
+- ✅ **Health Checks** - `/health` and `/ready` endpoints for load balancers
+- ✅ **Prometheus Metrics** - `/metrics` endpoint with connection and message stats
+- ✅ **Structured Logging** - JSON-formatted logs for production
+- ✅ **OpenTelemetry Tracing** - Request tracing for debugging
+- ✅ **Rate Limiting** - Per-user/IP rate limiting (60/min, 1000/hour)
+
+## 📖 Documentation
+
+- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
+- **[User Guide](docs/USER_GUIDE.md)** - Complete feature documentation
+- **[Architecture](docs/ARCHITECTURE.md)** - Technical architecture overview
+- **[Authentication](docs/AUTHENTICATION.md)** - Auth implementation details
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - AWS Elastic Beanstalk deployment
+- **[Codebase Explanation](docs/CODEBASE_EXPLANATION.md)** - Code understanding guide
 
 ## 🧪 Testing
 
 ```bash
 # Run all tests
-python -m pytest -q
+pytest
 
-# Run examples
-python examples/complete_chat_example.py
+# Run with coverage
+pytest --cov=app
 ```
 
 ## 📁 Project Structure
@@ -58,44 +65,51 @@ python examples/complete_chat_example.py
 ```
 Pneumatic/
 ├── app/                    # Application code
-│   ├── main.py            # FastAPI app & WebSocket
+│   ├── main.py            # FastAPI app, WebSocket, health/metrics
 │   ├── routes.py          # REST API endpoints
 │   ├── auth_routes.py     # Authentication endpoints
 │   ├── auth.py            # JWT & password hashing
 │   ├── websockets.py      # WebSocket connection manager
 │   ├── store_sql.py       # Database operations
 │   ├── models.py          # SQLAlchemy models
-│   └── schemas.py         # Pydantic schemas
+│   ├── schemas.py         # Pydantic schemas
+│   ├── metrics.py         # Prometheus metrics
+│   ├── logging_config.py  # Structured JSON logging
+│   ├── tracing.py         # OpenTelemetry tracing
+│   └── rate_limit.py      # Rate limiting middleware
+├── static/                # Frontend files
+│   ├── index.html         # Login/Signup page
+│   └── chat.html          # Main chat interface
 ├── tests/                 # Test suite
-├── examples/              # Code examples
-├── index.html            # Login/Signup page
-├── chat.html             # Main chat interface
-└── requirements.txt      # Dependencies
+├── docs/                  # Documentation
+├── .ebextensions/         # Elastic Beanstalk configuration
+├── requirements.txt       # Dependencies
+├── Procfile              # Production process definition
+└── pytest.ini            # Pytest configuration
 ```
 
 ## 🔧 Configuration
 
-### Environment Variables
+### Required Environment Variables
 
 ```bash
-# Database (optional)
-export DATABASE_URL="postgresql+asyncpg://user:pass@localhost/dbname"
+# Security (required)
+SECRET_KEY="your-very-secure-secret-key-minimum-32-characters"
 
-# Security (required in production)
-export SECRET_KEY="your-very-secure-secret-key-minimum-32-characters"
+# Database (required)
+DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/dbname"
 ```
 
-## 🎯 Use Cases
+### Optional Environment Variables
 
-1. **Team Chat** - Internal team communication
-2. **Customer Support** - Real-time support chat
-3. **Social Platform** - User-to-user messaging
-4. **Learning** - Study pub/sub patterns, WebSockets, JWT auth
+```bash
+# CORS (default: "*")
+ALLOWED_ORIGINS="https://yourdomain.com,https://www.yourdomain.com"
 
-## 📚 Learning Resources
-
-- **Complete Examples**: `examples/complete_chat_example.py`
-- **API Reference**: See `USER_GUIDE.md` for full API docs
+# Rate Limiting (default: 60/min, 1000/hour)
+RATE_LIMIT_PER_MINUTE=60
+RATE_LIMIT_PER_HOUR=1000
+```
 
 ## 🛠️ Tech Stack
 
@@ -104,6 +118,16 @@ export SECRET_KEY="your-very-secure-secret-key-minimum-32-characters"
 - **WebSockets** - Real-time communication
 - **JWT** - Token-based authentication
 - **Argon2** - Secure password hashing
+- **Prometheus** - Metrics format
+- **OpenTelemetry** - Distributed tracing
+- **Gunicorn** - Production WSGI server
+
+## 🎯 Use Cases
+
+1. **Team Chat** - Internal team communication
+2. **Customer Support** - Real-time support chat
+3. **Social Platform** - User-to-user messaging
+4. **Learning** - Study WebSockets, JWT auth, observability
 
 ## 📝 License
 

@@ -14,7 +14,12 @@ from .store_sql import store
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # JWT Configuration
-SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-change-in-production-min-32-chars")
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production-min-32-chars")
+if not SECRET_KEY or SECRET_KEY == "dev-secret-key-change-in-production-min-32-chars":
+    import warnings
+    warnings.warn("Using default SECRET_KEY. Set SECRET_KEY environment variable for production!", UserWarning)
+elif len(SECRET_KEY) < 32:
+    raise ValueError("SECRET_KEY must be at least 32 characters long")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7

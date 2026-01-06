@@ -20,13 +20,11 @@ env/
 .idea/
 *.swp
 *.swo
-.DS_Store
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
-.tox/
 
 # Database
 *.db
@@ -40,14 +38,17 @@ dev.db
 # Environment
 .env
 .env.local
-.env.*.local
 
-# Elastic Beanstalk
-.elasticbeanstalk/
-*.pyc
+# Git
+.git/
+.gitignore
 
-# AWS
-.aws-sam/
+# Documentation (optional - remove if you want to include)
+*.md
+!README.md
 
-# Documentation build
-docs/_build/
+# Examples
+examples/
+
+# Tests (optional - remove if you want to include)
+tests/

@@ -23,8 +23,11 @@ logger = logging.getLogger("pneumatic")
 
 app = FastAPI(title="Pneumatic Chat - Secure")
 
-# Setup rate limiting (before other middleware)
-# Default: 60 requests/minute, 1000 requests/hour per user/IP
+# Setup OpenTelemetry tracing (must be before other middleware)
+setup_tracing(app, engine)
+logger.info("OpenTelemetry tracing initialized", extra={"extra_fields": {"event": "tracing_init"}})
+
+# Setup rate limiting
 rate_limiter = RateLimiter(
     requests_per_minute=int(os.environ.get("RATE_LIMIT_PER_MINUTE", "60")),
     requests_per_hour=int(os.environ.get("RATE_LIMIT_PER_HOUR", "1000"))
@@ -40,12 +43,18 @@ async def read_root():
     return FileResponse("static/index.html")
 
 # Configure CORS
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "*")
+if allowed_origins_env == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE, OPTIONS, etc.)
-    allow_headers=["*"],  # Allows all headers including Authorization
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth_router)
@@ -100,11 +109,6 @@ async def on_startup():
     # Ensure database tables exist (creates if missing, preserves existing data)
     await init_db()
     logger.info("Database initialized", extra={"extra_fields": {"event": "db_init"}})
-
-    # Setup OpenTelemetry tracing after app is created
-    from .tracing import setup_tracing
-    setup_tracing(app, engine)
-    logger.info("OpenTelemetry tracing initialized", extra={"extra_fields": {"event": "tracing_init"}})
 
 
 
