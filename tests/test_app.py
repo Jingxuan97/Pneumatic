@@ -7,18 +7,41 @@ import uuid
 client = TestClient(app)
 
 
+def test_root_serves_index():
+    """Test that root route serves index.html"""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Pneumatic Chat" in response.text or "Login" in response.text
+
+
+def test_static_files_served():
+    """Test that static files are accessible"""
+    # Test index.html
+    response = client.get("/static/index.html")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+    # Test chat.html
+    response = client.get("/static/chat.html")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+
 def test_create_user_and_conv_and_send_http_message():
-    # create two users with authentication
-    r = client.post("/auth/signup", json={"username": "alice", "password": "pass123"})
-    assert r.status_code == 201
+    # create two users with authentication (use unique usernames)
+    import time
+    unique_id = str(int(time.time() * 1000))
+    r = client.post("/auth/signup", json={"username": f"alice_{unique_id}", "password": "pass123"})
+    assert r.status_code == 201, f"Signup failed: {r.json()}"
     alice = r.json()
 
-    r = client.post("/auth/signup", json={"username": "bob", "password": "pass123"})
-    assert r.status_code == 201
+    r = client.post("/auth/signup", json={"username": f"bob_{unique_id}", "password": "pass123"})
+    assert r.status_code == 201, f"Signup failed: {r.json()}"
     bob = r.json()
 
     # login as alice to get token
-    login = client.post("/auth/login", json={"username": "alice", "password": "pass123"})
+    login = client.post("/auth/login", json={"username": f"alice_{unique_id}", "password": "pass123"})
     assert login.status_code == 200
     alice_token = login.json()["access_token"]
 
@@ -52,17 +75,21 @@ def test_create_user_and_conv_and_send_http_message():
 
 
 def test_websocket_send_and_receive():
-    # create users with authentication
-    r = client.post("/auth/signup", json={"username": "w1", "password": "pass123"})
+    # create users with authentication (use unique usernames)
+    import time
+    unique_id = str(int(time.time() * 1000))
+    r = client.post("/auth/signup", json={"username": f"w1_{unique_id}", "password": "pass123"})
+    assert r.status_code == 201, f"Signup failed: {r.json()}"
     u1 = r.json()
-    r = client.post("/auth/signup", json={"username": "w2", "password": "pass123"})
+    r = client.post("/auth/signup", json={"username": f"w2_{unique_id}", "password": "pass123"})
+    assert r.status_code == 201, f"Signup failed: {r.json()}"
     u2 = r.json()
 
     # login to get tokens
-    login1 = client.post("/auth/login", json={"username": "w1", "password": "pass123"})
+    login1 = client.post("/auth/login", json={"username": f"w1_{unique_id}", "password": "pass123"})
     token1 = login1.json()["access_token"]
 
-    login2 = client.post("/auth/login", json={"username": "w2", "password": "pass123"})
+    login2 = client.post("/auth/login", json={"username": f"w2_{unique_id}", "password": "pass123"})
     token2 = login2.json()["access_token"]
 
     # create conversation (requires auth)

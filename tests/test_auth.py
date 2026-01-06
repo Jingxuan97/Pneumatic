@@ -12,14 +12,16 @@ client = TestClient(app)
 
 def test_signup_success():
     """Test successful user signup"""
+    import time
+    unique_username = f"testuser1_{int(time.time() * 1000)}"
     response = client.post(
         "/auth/signup",
-        json={"username": "testuser1", "password": "securepass123"}
+        json={"username": unique_username, "password": "securepass123"}
     )
-    assert response.status_code == 201
+    assert response.status_code == 201, f"Signup failed: {response.json()}"
     data = response.json()
     assert "id" in data
-    assert data["username"] == "testuser1"
+    assert data["username"] == unique_username
     assert "password" not in data  # Password should never be returned
 
 
@@ -42,17 +44,19 @@ def test_signup_duplicate_username():
 
 def test_login_success():
     """Test successful login returns tokens"""
-    # Create user first
+    # Create user first (use unique username)
+    import time
+    unique_username = f"loginuser_{int(time.time() * 1000)}"
     signup_response = client.post(
         "/auth/signup",
-        json={"username": "loginuser", "password": "mypassword"}
+        json={"username": unique_username, "password": "mypassword"}
     )
-    assert signup_response.status_code == 201
+    assert signup_response.status_code == 201, f"Signup failed: {signup_response.json()}"
 
     # Login
     response = client.post(
         "/auth/login",
-        json={"username": "loginuser", "password": "mypassword"}
+        json={"username": unique_username, "password": "mypassword"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -212,23 +216,27 @@ def test_protected_route_requires_auth():
 
 def test_create_conversation_with_auth():
     """Test creating conversation with authentication"""
-    # Create two users
+    # Create two users (use unique usernames)
+    import time
+    unique_id = str(int(time.time() * 1000))
     signup1 = client.post(
         "/auth/signup",
-        json={"username": "alice_auth", "password": "pass123"}
+        json={"username": f"alice_auth_{unique_id}", "password": "pass123"}
     )
+    assert signup1.status_code == 201, f"Signup failed: {signup1.json()}"
     alice = signup1.json()
 
     signup2 = client.post(
         "/auth/signup",
-        json={"username": "bob_auth", "password": "pass123"}
+        json={"username": f"bob_auth_{unique_id}", "password": "pass123"}
     )
+    assert signup2.status_code == 201, f"Signup failed: {signup2.json()}"
     bob = signup2.json()
 
     # Login as alice
     login = client.post(
         "/auth/login",
-        json={"username": "alice_auth", "password": "pass123"}
+        json={"username": f"alice_auth_{unique_id}", "password": "pass123"}
     )
     token = login.json()["access_token"]
 
@@ -337,23 +345,27 @@ def test_websocket_with_invalid_token():
 
 def test_websocket_message_enforces_sender():
     """Test WebSocket messages enforce sender_id matches authenticated user"""
-    # Create users
+    # Create users (use unique usernames)
+    import time
+    unique_id = str(int(time.time() * 1000))
     signup1 = client.post(
         "/auth/signup",
-        json={"username": "ws1", "password": "pass123"}
+        json={"username": f"ws1_{unique_id}", "password": "pass123"}
     )
+    assert signup1.status_code == 201, f"Signup failed: {signup1.json()}"
     user1 = signup1.json()
 
     signup2 = client.post(
         "/auth/signup",
-        json={"username": "ws2", "password": "pass123"}
+        json={"username": f"ws2_{unique_id}", "password": "pass123"}
     )
+    assert signup2.status_code == 201, f"Signup failed: {signup2.json()}"
     user2 = signup2.json()
 
     # Login as user1
     login1 = client.post(
         "/auth/login",
-        json={"username": "ws1", "password": "pass123"}
+        json={"username": f"ws1_{unique_id}", "password": "pass123"}
     )
     token1 = login1.json()["access_token"]
 

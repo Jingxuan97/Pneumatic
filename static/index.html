@@ -337,7 +337,12 @@
                     showError(data.detail || 'Signup failed');
                 }
             } catch (error) {
-                showError('Network error. Please check if the server is running.');
+                console.error('Signup error:', error);
+                if (error.message && error.message.includes('Failed to fetch')) {
+                    showError('Cannot connect to server. Make sure the server is running at http://localhost:8000');
+                } else {
+                    showError('Network error. Please check if the server is running.');
+                }
             } finally {
                 setLoading('signupBtn', false);
             }
@@ -378,44 +383,91 @@
                     }
 
                     // Redirect to chat page
-                    window.location.href = 'chat.html';
+                    window.location.href = '/static/chat.html';
                 } else {
                     showError(data.detail || 'Login failed');
                 }
             } catch (error) {
-                showError('Network error. Please check if the server is running.');
+                console.error('Login error:', error);
+                if (error.message && error.message.includes('Failed to fetch')) {
+                    showError('Cannot connect to server. Make sure the server is running at http://localhost:8000');
+                } else {
+                    showError('Network error. Please check if the server is running.');
+                }
             } finally {
                 setLoading('loginBtn', false);
             }
         }
 
-        // Check if already logged in - show option to switch account
-        if (localStorage.getItem('accessToken')) {
-            const loggedInUsername = localStorage.getItem('username') || 'User';
-            const loggedInFullName = localStorage.getItem('fullName');
-            const displayName = loggedInFullName || loggedInUsername;
+        // Check if already logged in - validate token first
+        async function checkLoginStatus() {
+            const accessToken = localStorage.getItem('accessToken');
+            if (!accessToken) {
+                return;
+            }
 
-            // Show a message that user is already logged in
-            const container = document.querySelector('.auth-container');
-            const switchAccountDiv = document.createElement('div');
-            switchAccountDiv.className = 'switch-account-notice';
-            switchAccountDiv.innerHTML = `
-                <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                    <p style="margin-bottom: 12px; color: #856404;">
-                        You're currently logged in as <strong>${displayName}</strong> (@${loggedInUsername})
-                    </p>
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="window.location.href='chat.html'" class="btn btn-primary" style="flex: 1;">
-                            Go to Chat
-                        </button>
-                        <button onclick="switchAccount()" class="btn" style="flex: 1; background: #f0f0f0; color: #333;">
-                            Switch Account
-                        </button>
-                    </div>
-                </div>
-            `;
-            container.insertBefore(switchAccountDiv, container.firstChild);
+            // Validate token by checking if user still exists
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    // Token is valid, show logged in message
+                    const userData = await response.json();
+                    const loggedInUsername = userData.username || localStorage.getItem('username') || 'User';
+                    const loggedInFullName = userData.full_name || localStorage.getItem('fullName');
+                    const displayName = loggedInFullName || loggedInUsername;
+
+                    // Update localStorage with fresh data
+                    localStorage.setItem('username', loggedInUsername);
+                    if (loggedInFullName) {
+                        localStorage.setItem('fullName', loggedInFullName);
+                    }
+                    localStorage.setItem('userId', userData.id);
+
+                    // Show a message that user is already logged in
+                    const container = document.querySelector('.auth-container');
+                    const switchAccountDiv = document.createElement('div');
+                    switchAccountDiv.className = 'switch-account-notice';
+                    switchAccountDiv.innerHTML = `
+                        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                            <p style="margin-bottom: 12px; color: #856404;">
+                                You're currently logged in as <strong>${displayName}</strong> (@${loggedInUsername})
+                            </p>
+                            <div style="display: flex; gap: 10px;">
+                                <button onclick="window.location.href='/static/chat.html'" class="btn btn-primary" style="flex: 1;">
+                                    Go to Chat
+                                </button>
+                                <button onclick="switchAccount()" class="btn" style="flex: 1; background: #f0f0f0; color: #333;">
+                                    Switch Account
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    container.insertBefore(switchAccountDiv, container.firstChild);
+                } else {
+                    // Token is invalid, clear localStorage
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
+                    localStorage.removeItem('userId');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('fullName');
+                }
+            } catch (error) {
+                // Error validating token, clear localStorage
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('userId');
+                localStorage.removeItem('username');
+                localStorage.removeItem('fullName');
+            }
         }
+
+        // Check login status on page load
+        checkLoginStatus();
 
         function switchAccount() {
             // Clear all stored data

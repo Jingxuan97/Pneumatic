@@ -2,6 +2,8 @@
 import os
 from fastapi import FastAPI, WebSocket, status, WebSocketDisconnect, WebSocketException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from .routes import router
 from .auth_routes import router as auth_router
 from .websockets import manager
@@ -11,6 +13,14 @@ from .db import DATABASE_URL, init_db
 from .auth import get_current_user_websocket
 
 app = FastAPI(title="Pneumatic Chat - Secure")
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Serve index.html at root
+@app.get("/")
+async def read_root():
+    return FileResponse("static/index.html")
 
 # Configure CORS
 app.add_middleware(
@@ -24,22 +34,11 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(router)
 
-import logging
-logger = logging.getLogger("pneumatic")
-logger.setLevel(logging.DEBUG)
-# ensure handler exists once
-if not logger.handlers:
-    import sys
-    h = logging.StreamHandler(sys.stdout)
-    h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    logger.addHandler(h)
-
 
 @app.on_event("startup")
 async def on_startup():
     # Ensure database tables exist (creates if missing, preserves existing data)
     await init_db()
-    logger.info("Application started")
 
 
 
@@ -50,13 +49,10 @@ async def websocket_endpoint(websocket: WebSocket):
     Requires authentication token in query parameter or Authorization header.
     Token format: ?token=<access_token> or Authorization: Bearer <access_token>
     """
-    logger.debug("WS connect attempt")
-
     try:
         # Authenticate user from token
         user = await get_current_user_websocket(websocket)
         user_id = user["id"]
-        logger.debug("WS authenticated user_id=%s", user_id)
 
         await manager.connect(user_id, websocket)
 
@@ -83,7 +79,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         continue
 
                     await websocket.send_json({"type": "joined", "conversation_id": conv_id})
-                    logger.debug("WS %s joined conv=%s", user_id, conv_id)
 
                 elif typ == "message":
                     # validate message shape
@@ -98,34 +93,28 @@ async def websocket_endpoint(websocket: WebSocket):
                         await websocket.send_json({"type": "error", "reason": "invalid message shape"})
                         continue
 
-                    logger.debug("WS %s saving message id=%s conv=%s", user_id, data["message_id"], data["conversation_id"])
                     # save_message is async now — await it
                     try:
                         saved = await store.save_message(mc)
                     except (KeyError, PermissionError) as e:
                         await websocket.send_json({"type": "error", "reason": str(e)})
                         continue
-                    logger.debug("WS %s saved message -> %r", user_id, saved)
 
                     payload = {"type": "message", "message": saved}
                     # broadcast to members (manager.broadcast_to_conversation is async)
-                    logger.debug("WS %s calling manager.broadcast_to_conversation conv=%s", user_id, saved["conversation_id"])
                     await manager.broadcast_to_conversation(saved["conversation_id"], payload)
                 else:
                     await websocket.send_json({"type": "error", "reason": "unknown type"})
         except WebSocketDisconnect:
             # client disconnected; ensure we remove the connection and exit cleanly
-            logger.debug("WS %s disconnected", user_id)
             await manager.disconnect(user_id, websocket)
             return
         except Exception as e:
             # ensure we remove the connection on any other error
-            logger.exception("WS %s error", user_id)
             await manager.disconnect(user_id, websocket)
             raise
     except WebSocketException as e:
         # Authentication failed
-        logger.debug("WS authentication failed: %s", e.reason)
         try:
             await websocket.close(code=e.code, reason=e.reason)
         except Exception:
@@ -133,7 +122,6 @@ async def websocket_endpoint(websocket: WebSocket):
         return
     except Exception as e:
         # Other errors during connection
-        logger.exception("WS connection error")
         try:
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
         except Exception:

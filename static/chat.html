@@ -401,10 +401,11 @@
         let conversations = [];
         let allUsers = [];
         let userMap = {}; // username -> userId mapping
+        let userIdToUserMap = {}; // userId -> user object mapping
 
         // Check authentication
         if (!accessToken || !userId) {
-            window.location.href = 'index.html';
+            window.location.href = '/';
         }
 
         // Set user info
@@ -417,7 +418,7 @@
             if (response && (response.status === 401 || response.status === 403)) {
                 console.warn('Authentication failed, redirecting to login');
                 localStorage.clear();
-                window.location.href = 'index.html';
+                window.location.href = '/';
                 return true;
             }
             return false;
@@ -441,11 +442,50 @@
                     const data = await response.json();
                     allUsers = data.users;
 
+                    // Filter out test users (users with timestamps or obvious test patterns)
+                    const isTestUser = (username) => {
+                        const lowerUsername = username.toLowerCase();
+
+                        // Check for timestamp patterns (10+ digits at the end) - these are from automated tests
+                        if (/\d{10,}$/.test(username)) {
+                            return true;
+                        }
+
+                        // Check for obvious test patterns in username
+                        const testPatterns = [
+                            '_auth_', '_test_',
+                            'testuser', 'loginuser',
+                            'member1', 'member2',
+                            'sender_test', 'sender_test',
+                            'refresh', 'refresherror',
+                            'wrongpass',
+                            'wsuser', 'ws1_', 'ws2_', 'w1_', 'w2_',
+                            'duplicate',
+                            'meuser'
+                        ];
+
+                        return testPatterns.some(pattern => lowerUsername.includes(pattern));
+                    };
+
+                    const realUsers = allUsers.filter(user => !isTestUser(user.username));
+
+                    // Build user ID to user mapping for quick lookups
+                    userIdToUserMap = {};
+                    allUsers.forEach(user => {
+                        userIdToUserMap[user.id] = user;
+                    });
+                    // Also include current user in the map
+                    userIdToUserMap[userId] = {
+                        id: userId,
+                        username: username,
+                        full_name: fullName
+                    };
+
                     const listEl = document.getElementById('usersList');
-                    if (allUsers.length === 0) {
+                    if (realUsers.length === 0) {
                         listEl.innerHTML = '<div class="empty-state">No other users</div>';
                     } else {
-                        listEl.innerHTML = allUsers.map(user => {
+                        listEl.innerHTML = realUsers.map(user => {
                             const displayName = user.full_name || user.username;
                             const initial = user.username[0].toUpperCase();
                             return `
@@ -527,7 +567,33 @@
             }
         }
 
-        async function loadConversations() {
+        // Helper function to get display name for a conversation
+        function getConversationDisplayName(conv) {
+            // For 1-on-1 conversations (exactly 2 members), show the other user's name
+            if (conv.members && conv.members.length === 2) {
+                const otherUserId = conv.members.find(id => id !== userId);
+                if (otherUserId) {
+                    // Check if we have user info in the map
+                    if (userIdToUserMap[otherUserId]) {
+                        const otherUser = userIdToUserMap[otherUserId];
+                        return otherUser.full_name || otherUser.username;
+                    }
+                    // If user not in map yet, try to find in allUsers
+                    const otherUser = allUsers.find(u => u.id === otherUserId);
+                    if (otherUser) {
+                        return otherUser.full_name || otherUser.username;
+                    }
+                    // Fallback to username from conversation title if available
+                    if (conv.title && conv.title !== 'Untitled') {
+                        return conv.title;
+                    }
+                }
+            }
+            // For group conversations, use the title
+            return conv.title || 'Untitled';
+        }
+
+        async function loadConversations(highlightNewId = null) {
             try {
                 const response = await fetch(`${API_BASE}/conversations`, {
                     headers: {
@@ -537,6 +603,7 @@
 
                 if (response.ok) {
                     const data = await response.json();
+                    const previousConvIds = new Set(conversations.map(c => c.id));
                     conversations = data.conversations;
 
                     const listEl = document.getElementById('conversationsList');
@@ -545,13 +612,31 @@
                     } else {
                         listEl.innerHTML = conversations.map(conv => {
                             const isActive = conv.id === currentConversationId ? 'active' : '';
+                            const isNew = highlightNewId === conv.id || (!previousConvIds.has(conv.id) && highlightNewId === null);
+                            const newClass = isNew ? 'new-conversation' : '';
+                            const displayName = getConversationDisplayName(conv);
                             return `
-                                <div class="conversation-item ${isActive}" onclick="selectConversation('${conv.id}')">
-                                    <div class="conversation-title">${conv.title || 'Untitled'}</div>
+                                <div class="conversation-item ${isActive} ${newClass}" onclick="selectConversation('${conv.id}')">
+                                    <div class="conversation-title">${displayName}${isNew ? ' <span style="color: #667eea; font-size: 0.8em;">(new)</span>' : ''}</div>
                                     <div class="conversation-preview">${conv.members.length} member${conv.members.length !== 1 ? 's' : ''}</div>
                                 </div>
                             `;
                         }).join('');
+
+                        // Remove highlight after 3 seconds
+                        if (highlightNewId) {
+                            setTimeout(() => {
+                                const item = listEl.querySelector(`[onclick*="${highlightNewId}"]`);
+                                if (item) {
+                                    item.classList.remove('new-conversation');
+                                    const title = item.querySelector('.conversation-title');
+                                    if (title) {
+                                        // Remove the (new) span but keep the display name
+                                        title.innerHTML = title.innerHTML.replace(' <span style="color: #667eea; font-size: 0.8em;">(new)</span>', '');
+                                    }
+                                }
+                            }, 3000);
+                        }
                     }
                 } else if (handleAuthError(response)) {
                     return; // Redirected to login
@@ -631,7 +716,8 @@
 
             const conv = conversations.find(c => c.id === convId);
             if (conv) {
-                document.getElementById('chatHeader').innerHTML = `<h3>${conv.title || 'Untitled'}</h3>`;
+                const displayName = getConversationDisplayName(conv);
+                document.getElementById('chatHeader').innerHTML = `<h3>${displayName}</h3>`;
                 document.getElementById('inputArea').style.display = 'flex';
                 loadMessages(convId);
 
@@ -703,12 +789,23 @@
                 }
             };
 
-            ws.onmessage = (event) => {
+            ws.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
 
                 if (data.type === 'message') {
                     const msg = data.message;
-                    if (msg.conversation_id === currentConversationId) {
+                    const convId = msg.conversation_id;
+
+                    // Check if this conversation exists in our local list
+                    const existingConv = conversations.find(c => c.id === convId);
+
+                    // If conversation doesn't exist locally, reload conversations list and highlight it
+                    if (!existingConv) {
+                        await loadConversations(convId);
+                    }
+
+                    // If this is the currently selected conversation, display the message
+                    if (convId === currentConversationId) {
                         // Add message to display
                         const container = document.getElementById('messagesContainer');
                         const isOwn = msg.sender_id === userId;
@@ -723,6 +820,9 @@
                         `;
                         container.appendChild(messageDiv);
                         container.scrollTop = container.scrollHeight;
+                    } else {
+                        // Message in a different conversation - could add visual indicator here
+                        // For now, the conversation will appear in the list after reloadConversations
                     }
                 } else if (data.type === 'joined') {
                     console.log('Joined conversation:', data.conversation_id);
@@ -741,7 +841,7 @@
                 if (event.code === 1008) { // Policy violation (authentication failed)
                     console.warn('WebSocket authentication failed, redirecting to login');
                     localStorage.clear();
-                    window.location.href = 'index.html';
+                    window.location.href = '/';
                     return;
                 }
                 // Otherwise, reconnect after 3 seconds
@@ -783,7 +883,7 @@
             if (ws) {
                 ws.close();
             }
-            window.location.href = 'index.html';
+            window.location.href = '/';
         }
 
         // Initialize on load
