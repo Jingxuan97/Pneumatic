@@ -1,6 +1,6 @@
 # Pneumatic Chat - Secure Real-Time Messaging
 
-A production-ready real-time chat application with JWT authentication, WebSocket messaging, and Redis pub/sub for horizontal scaling.
+A production-ready real-time chat application with JWT authentication and WebSocket messaging.
 
 ## 🚀 Quick Start
 
@@ -27,7 +27,6 @@ Server runs at: `http://localhost:8000`
 - **[User Guide](USER_GUIDE.md)** - Complete feature documentation
 - **[Architecture](ARCHITECTURE.md)** - Technical architecture overview
 - **[Authentication](AUTHENTICATION.md)** - Auth implementation details
-- **[Redis Setup](REDIS_SETUP.md)** - Redis pub/sub configuration
 - **[Testing Guide](TESTING_GUIDE.md)** - How to test features
 
 ## ✨ Features
@@ -40,8 +39,6 @@ Server runs at: `http://localhost:8000`
 - ✅ **Modern UI/UX** - Beautiful, responsive web interface
 
 ### Advanced Features
-- ✅ **Redis Pub/Sub** - Horizontal scaling across multiple server instances
-- ✅ **Presence Tracking** - Know who's online with TTL-based tracking
 - ✅ **Message Idempotency** - Prevent duplicate messages
 - ✅ **Multiple Devices** - Connect from phone, laptop, tablet simultaneously
 - ✅ **Permission Checks** - Conversation membership validation
@@ -52,14 +49,8 @@ Server runs at: `http://localhost:8000`
 # Run all tests
 python -m pytest -q
 
-# Test Redis connection
-python test_redis_connection.py
-
-# Test multi-instance flow
-python test_multi_instance.py
-
 # Run examples
-python examples/redis_example.py
+python examples/complete_chat_example.py
 ```
 
 ## 📁 Project Structure
@@ -72,7 +63,6 @@ Pneumatic/
 │   ├── auth_routes.py     # Authentication endpoints
 │   ├── auth.py            # JWT & password hashing
 │   ├── websockets.py      # WebSocket connection manager
-│   ├── pubsub.py          # Redis pub/sub adapter
 │   ├── store_sql.py       # Database operations
 │   ├── models.py          # SQLAlchemy models
 │   └── schemas.py         # Pydantic schemas
@@ -91,14 +81,8 @@ Pneumatic/
 # Database (optional)
 export DATABASE_URL="postgresql+asyncpg://user:pass@localhost/dbname"
 
-# Redis (optional - for multi-instance)
-export REDIS_URL="redis://localhost:6379/0"
-
 # Security (required in production)
 export SECRET_KEY="your-very-secure-secret-key-minimum-32-characters"
-
-# Presence TTL (optional)
-export PRESENCE_TTL_SECONDS="300"  # 5 minutes default
 ```
 
 ## 🎯 Use Cases
@@ -111,7 +95,6 @@ export PRESENCE_TTL_SECONDS="300"  # 5 minutes default
 ## 📚 Learning Resources
 
 - **Complete Examples**: `examples/complete_chat_example.py`
-- **Redis Examples**: `examples/redis_example.py`
 - **API Reference**: See `USER_GUIDE.md` for full API docs
 
 ## 🛠️ Tech Stack
@@ -119,7 +102,6 @@ export PRESENCE_TTL_SECONDS="300"  # 5 minutes default
 - **FastAPI** - Modern Python web framework
 - **SQLAlchemy** - Async ORM
 - **WebSockets** - Real-time communication
-- **Redis** - Pub/sub messaging (optional)
 - **JWT** - Token-based authentication
 - **Argon2** - Secure password hashing
 

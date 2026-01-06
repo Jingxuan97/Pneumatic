@@ -13,4 +13,3 @@ aiosqlite==0.17.0
 passlib[argon2]==1.7.4
 PyJWT==2.8.0
 python-dotenv==1.0.0
-redis[hiredis]==5.0.1

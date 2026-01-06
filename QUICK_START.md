@@ -142,7 +142,7 @@ ws.onmessage = (e) => {
 ## 📚 Learn More
 
 - **Full Guide**: See `USER_GUIDE.md` for comprehensive documentation
-- **Examples**: Run `python examples/redis_example.py` for code examples
+- **Examples**: Run `python examples/complete_chat_example.py` for code examples
 - **API Docs**: Visit http://localhost:8000/docs for interactive API documentation
 - **Architecture**: See `ARCHITECTURE.md` for technical details
 
@@ -153,8 +153,7 @@ ws.onmessage = (e) => {
 1. **Start Simple**: Use the web UI (`index.html`)
 2. **Try API**: Use curl or Postman to test endpoints
 3. **Build Client**: Create your own client using WebSocket API
-4. **Advanced**: Set up Redis for multi-instance testing
-5. **Explore**: Check out the code examples in `examples/`
+4. **Explore**: Check out the code examples in `examples/`
 
 ---
 

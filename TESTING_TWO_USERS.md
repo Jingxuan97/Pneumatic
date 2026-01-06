@@ -106,9 +106,6 @@ uvicorn app.main:app --reload
 - Bob starts a conversation with Alice
 - Both conversations should appear in each user's list
 
-### Test 4: Presence (if Redis is running)
-- When a user is online, they appear in the Users list
-- When they disconnect, they may show as offline (depending on implementation)
 
 ## Tips
 

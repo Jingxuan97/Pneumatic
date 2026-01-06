@@ -301,57 +301,6 @@ Users can connect from multiple devices simultaneously:
 - Each device maintains its own WebSocket connection
 - All devices receive broadcasts automatically
 
-### Redis Pub/Sub (Multi-Instance)
-
-If you have Redis running, you can run multiple server instances:
-
-**Terminal 1:**
-```bash
-uvicorn main:app --port 8000
-```
-
-**Terminal 2:**
-```bash
-uvicorn main:app --port 8001
-```
-
-**How it works:**
-- User connects to instance 1 (port 8000)
-- User connects to instance 2 (port 8001)
-- Message sent from instance 1 → Redis → Instance 2 receives it
-- Both users get the message in real-time
-
-**Test it:**
-1. Open two browser windows
-2. Connect one to `http://localhost:8000`
-3. Connect the other to `http://localhost:8001`
-4. Join the same conversation in both
-5. Send a message from one → both receive it!
-
-### Presence Tracking
-
-**Check if users are online:**
-```python
-from app.pubsub import PresenceManager
-from redis.asyncio import Redis
-
-redis = Redis.from_url("redis://localhost:6379/0", decode_responses=True)
-presence = PresenceManager(redis)
-
-# Check single user
-is_online = await presence.is_online("user-id")
-
-# Check multiple users
-online_users = await presence.get_online_users(["user-1", "user-2", "user-3"])
-# Returns: ["user-1", "user-2"]  (only online ones)
-```
-
-**How it works:**
-- When user connects → presence key created in Redis
-- Key expires after 5 minutes (TTL)
-- If user disconnects → key removed immediately
-- If user crashes → key expires automatically
-
 ---
 
 ## Complete Example: Full Chat Flow
@@ -648,15 +597,6 @@ ws.onopen = () => {
 3. Verify WebSocket is connected: `ws.readyState === WebSocket.OPEN`
 4. Check server logs for errors
 
-### Redis Connection Issues
-
-**Problem:** Redis errors in logs
-
-**Solutions:**
-1. Check Redis is running: `redis-cli ping`
-2. Verify Redis URL: `echo $REDIS_URL`
-3. App will fall back to local broadcast if Redis unavailable
-
 ---
 
 ## Best Practices
@@ -676,7 +616,6 @@ ws.onopen = () => {
 1. ✅ Try the web UI (`index.html`)
 2. ✅ Test API endpoints with curl or Postman
 3. ✅ Build your own client using the WebSocket API
-4. ✅ Set up Redis for multi-instance testing
-5. ✅ Explore the API docs at `/docs`
+4. ✅ Explore the API docs at `/docs`
 
 Happy chatting! 💬
