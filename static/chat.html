@@ -775,7 +775,9 @@
 
                 if (response.ok) {
                     const conv = await response.json();
+                    console.log('Group chat created:', conv.id);
                     await loadConversations(conv.id);
+                    // Select the conversation (this will join via WebSocket and load messages)
                     selectConversation(conv.id);
                     closeNewConversationModal();
                 } else if (handleAuthError(response)) {
@@ -791,6 +793,7 @@
         }
 
         function selectConversation(convId) {
+            console.log('Selecting conversation:', convId);
             currentConversationId = convId;
 
             // Update UI
@@ -806,14 +809,23 @@
                 const displayName = getConversationDisplayName(conv);
                 document.getElementById('chatHeader').innerHTML = `<h3>${displayName}</h3>`;
                 document.getElementById('inputArea').style.display = 'flex';
+
+                // Load existing messages first
                 loadMessages(convId);
 
-                // Join conversation via WebSocket
+                // Join conversation via WebSocket (important for receiving real-time messages)
                 if (ws && ws.readyState === WebSocket.OPEN) {
+                    console.log('Joining conversation via WebSocket:', convId);
                     ws.send(JSON.stringify({
                         type: 'join',
                         conversation_id: convId
                     }));
+                } else if (ws) {
+                    console.warn('WebSocket not open, state:', ws.readyState, '- will join when connected');
+                    // If WebSocket is connecting, it will join on open (see ws.onopen handler)
+                } else {
+                    console.warn('WebSocket not initialized - connecting...');
+                    connectWebSocket();
                 }
             }
         }
@@ -860,6 +872,11 @@
 
         function displayMessages(messages) {
             const container = document.getElementById('messagesContainer');
+            if (!container) {
+                console.error('Messages container not found in displayMessages!');
+                return;
+            }
+
             if (messages.length === 0) {
                 // Only show empty state if container is truly empty
                 if (!container.querySelector('.message')) {
@@ -872,6 +889,12 @@
             const existingMessageIds = new Set();
             container.querySelectorAll('[data-message-id]').forEach(el => {
                 existingMessageIds.add(el.getAttribute('data-message-id'));
+            });
+
+            console.log('displayMessages called:', {
+                messageCount: messages.length,
+                existingMessageCount: existingMessageIds.size,
+                conversationId: currentConversationId
             });
 
             // Clear container but preserve structure
@@ -895,6 +918,7 @@
             });
 
             container.scrollTop = container.scrollHeight;
+            console.log('displayMessages completed:', messages.length, 'messages displayed');
         }
 
         function updateConnectionStatus(status) {
@@ -921,12 +945,20 @@
                 updateConnectionStatus('connected');
                 // Always join the current conversation when WebSocket opens
                 // This ensures we receive messages even after reconnection
+                // Note: Join is just a confirmation - messages are broadcast to all members regardless
                 if (currentConversationId) {
                     console.log('Joining conversation on WebSocket connect:', currentConversationId);
-                    ws.send(JSON.stringify({
-                        type: 'join',
-                        conversation_id: currentConversationId
-                    }));
+                    try {
+                        ws.send(JSON.stringify({
+                            type: 'join',
+                            conversation_id: currentConversationId
+                        }));
+                        console.log('Join message sent for conversation:', currentConversationId);
+                    } catch (error) {
+                        console.error('Error sending join message:', error);
+                    }
+                } else {
+                    console.log('No current conversation to join');
                 }
             };
 
@@ -957,7 +989,13 @@
 
                         // If this is the currently selected conversation, display the message
                         if (convId === currentConversationId) {
-                            console.log('Displaying message in current conversation');
+                            console.log('Displaying message in current conversation:', {
+                                messageId: msg.message_id,
+                                senderId: msg.sender_id,
+                                content: msg.content.substring(0, 50) + '...',
+                                conversationId: convId
+                            });
+
                             // Add message to display
                             const container = document.getElementById('messagesContainer');
                             if (!container) {
@@ -965,7 +1003,7 @@
                                 return;
                             }
 
-                            // Remove empty state if present
+                            // Remove empty state if present (without clearing all messages)
                             const emptyState = container.querySelector('.empty-state');
                             if (emptyState) {
                                 emptyState.remove();
@@ -978,10 +1016,11 @@
                             // Check if message already exists (prevent duplicates)
                             const existingMessage = container.querySelector(`[data-message-id="${msg.message_id}"]`);
                             if (existingMessage) {
-                                console.log('Message already displayed, skipping duplicate');
+                                console.log('Message already displayed, skipping duplicate:', msg.message_id);
                                 return;
                             }
 
+                            // Create and append message
                             const messageDiv = document.createElement('div');
                             messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
                             messageDiv.setAttribute('data-message-id', msg.message_id);
@@ -992,19 +1031,32 @@
                             `;
                             container.appendChild(messageDiv);
                             container.scrollTop = container.scrollHeight;
-                            console.log('Message displayed successfully:', msg.content);
+                            console.log('✅ Message displayed successfully in UI:', {
+                                messageId: msg.message_id,
+                                sender: senderName,
+                                isOwn: isOwn
+                            });
                         } else {
                             console.log('Message for different conversation. Received convId:', convId, 'Current convId:', currentConversationId);
                             // Message in a different conversation - reload conversations to show it in the list
                             await loadConversations();
                         }
                     } else if (data.type === 'joined') {
-                        console.log('Joined conversation:', data.conversation_id);
+                        console.log('Successfully joined conversation:', data.conversation_id);
+                        // Verify we're in the right conversation
+                        if (data.conversation_id === currentConversationId) {
+                            console.log('Confirmed: Joined current conversation, ready to receive messages');
+                        } else {
+                            console.warn('Joined different conversation:', data.conversation_id, 'Current:', currentConversationId);
+                        }
                     } else if (data.type === 'error') {
                         console.error('WebSocket error:', data.reason);
-                        alert('Error: ' + data.reason);
+                        // Don't alert for all errors - some are expected (e.g., not a member)
+                        if (data.reason && !data.reason.includes('not a member')) {
+                            console.error('Unexpected WebSocket error:', data.reason);
+                        }
                     } else {
-                        console.log('Unknown message type:', data.type);
+                        console.log('Unknown message type:', data.type, data);
                     }
                 } catch (error) {
                     console.error('Error processing WebSocket message:', error, event.data);
