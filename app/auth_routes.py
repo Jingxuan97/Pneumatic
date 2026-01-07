@@ -1,5 +1,5 @@
 # app/auth_routes.py
-from fastapi import APIRouter, HTTPException, status, Depends, Request
+from fastapi import APIRouter, HTTPException, status, Depends
 from .schemas import UserCreate, UserResponse, UserLogin, Token, TokenRefresh
 from .store_sql import store
 from .auth import (

@@ -1,26 +1,31 @@
 # app/websockets.py
 import asyncio
-from typing import Dict, List, Union, Optional
-from fastapi import WebSocket, status, WebSocketDisconnect
+from typing import Dict, List
+from fastapi import WebSocket, WebSocketDisconnect
 from .store_sql import store
-from .schemas import MessageCreate
 
 
 class ConnectionManager:
     def __init__(self):
         # Store multiple connections per user as a list
         self.active: Dict[str, List[WebSocket]] = {}
-        self.lock = asyncio.Lock()
+        self._lock = None
+
+    def _get_lock(self):
+        """Lazy initialization of asyncio.Lock() - creates it when first needed in async context."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def connect(self, user_id: str, websocket: WebSocket):
         await websocket.accept()
-        async with self.lock:
+        async with self._get_lock():
             if user_id not in self.active:
                 self.active[user_id] = []
             self.active[user_id].append(websocket)
 
     async def disconnect(self, user_id: str, websocket: WebSocket = None):
-        async with self.lock:
+        async with self._get_lock():
             if user_id not in self.active:
                 return
 
@@ -46,7 +51,7 @@ class ConnectionManager:
 
     async def send_personal(self, user_id: str, data: dict):
         """Send data to all connections for a specific user"""
-        async with self.lock:
+        async with self._get_lock():
             connections = self.active.get(user_id, [])
 
         for ws in connections:
@@ -74,7 +79,7 @@ class ConnectionManager:
         member_ids = conv.get("members") or []
 
         # For each member, send to all their active websocket connections
-        async with self.lock:
+        async with self._get_lock():
             # Create a snapshot of connections to avoid holding lock during sends
             member_connections = {
                 member_id: list(self.active.get(member_id, []))

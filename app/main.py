@@ -164,20 +164,37 @@ async def websocket_endpoint(websocket: WebSocket):
                             conversation_id=data["conversation_id"],
                             content=data["content"],
                         )
-                    except KeyError:
+                    except KeyError as e:
+                        logger.error(f"Invalid message shape: {e}", exc_info=True)
                         await websocket.send_json({"type": "error", "reason": "invalid message shape"})
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error creating MessageCreate: {e}", exc_info=True)
+                        await websocket.send_json({"type": "error", "reason": f"invalid message: {str(e)}"})
                         continue
 
                     # save_message is async now — await it
                     try:
                         saved = await store.save_message(mc)
                     except (KeyError, PermissionError) as e:
+                        logger.error(f"Message save error: {e}", exc_info=True)
                         await websocket.send_json({"type": "error", "reason": str(e)})
                         continue
+                    except Exception as e:
+                        logger.error(f"Unexpected error saving message: {e}", exc_info=True)
+                        await websocket.send_json({"type": "error", "reason": f"failed to save message: {str(e)}"})
+                        continue
 
-                    payload = {"type": "message", "message": saved}
                     # broadcast to members (manager.broadcast_to_conversation is async)
-                    await manager.broadcast_to_conversation(saved["conversation_id"], payload)
+                    try:
+                        payload = {"type": "message", "message": saved}
+                        await manager.broadcast_to_conversation(saved["conversation_id"], payload)
+                    except Exception as e:
+                        logger.error(f"Error broadcasting message: {e}", exc_info=True)
+                        # Don't fail the message send if broadcast fails, but log it
+                        await websocket.send_json({"type": "error", "reason": f"message saved but broadcast failed: {str(e)}"})
+                        continue
+
                     # Track message metric
                     metrics.increment_message_sent()
                     logger.info(
@@ -193,12 +210,20 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "error", "reason": "unknown type"})
         except WebSocketDisconnect:
             # client disconnected; ensure we remove the connection and exit cleanly
+            logger.info(f"WebSocket disconnected by client for user {user_id}")
             await manager.disconnect(user_id, websocket)
             return
         except Exception as e:
+            # Log the error before disconnecting
+            logger.error(f"WebSocket error for user {user_id}: {e}", exc_info=True)
             # ensure we remove the connection on any other error
+            try:
+                await websocket.send_json({"type": "error", "reason": f"server error: {str(e)}"})
+            except Exception:
+                pass
             await manager.disconnect(user_id, websocket)
-            raise
+            # Don't re-raise - just log and disconnect cleanly
+            return
     except WebSocketException as e:
         # Authentication failed
         try:

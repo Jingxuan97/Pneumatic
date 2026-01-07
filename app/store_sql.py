@@ -1,6 +1,6 @@
 # app/store_sql.py
 from typing import Dict, Any, List, Optional
-from sqlalchemy import select, insert, func
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import AsyncSessionLocal
@@ -13,7 +13,7 @@ class SQLStore:
         pass
 
     # Users
-    async def create_user(self, username: str, password_hash: str, full_name: str | None = None) -> Dict[str, str]:
+    async def create_user(self, username: str, password_hash: str, full_name: Optional[str] = None) -> Dict[str, str]:
         """Create a new user with username, password hash, and optional full name."""
         async with AsyncSessionLocal() as session:
             u = User(username=username, password_hash=password_hash, full_name=full_name)
@@ -47,7 +47,7 @@ class SQLStore:
                 }
             return None
 
-    async def list_all_users(self, exclude_user_id: str | None = None) -> List[Dict[str, Any]]:
+    async def list_all_users(self, exclude_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all users, optionally excluding a specific user."""
         async with AsyncSessionLocal() as session:
             query = select(User)
@@ -200,12 +200,17 @@ class SQLStore:
                 raise PermissionError("sender is not a member of this conversation")
 
             # Create message; rely on unique(message_id) to dedupe
+            # Convert timezone-aware datetime to naive for database compatibility
+            # The column is defined as timezone=False, so we need naive datetime
+            now_utc = datetime.now(timezone.utc)
+            created_at_naive = now_utc.replace(tzinfo=None) if now_utc.tzinfo else now_utc
+
             msg = Message(
                 message_id=message_payload.message_id,
                 sender_id=message_payload.sender_id,
                 conversation_id=message_payload.conversation_id,
                 content=message_payload.content,
-                created_at=datetime.now(timezone.utc)
+                created_at=created_at_naive
             )
             session.add(msg)
             try:

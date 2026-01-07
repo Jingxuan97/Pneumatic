@@ -1,7 +1,6 @@
 # app/models.py
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base
 import uuid
 from datetime import datetime, timezone
 
@@ -11,7 +10,9 @@ def gen_uuid():
     return str(uuid.uuid4())
 
 def utc_now():
-    return datetime.now(timezone.utc)
+    # Return naive datetime to match column definition (timezone=False)
+    # This ensures compatibility with both SQLite and PostgreSQL
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class User(Base):
     __tablename__ = "users"

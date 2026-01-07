@@ -22,7 +22,9 @@ Server runs at: `http://localhost:8000`
 
 ### Production Deployment
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for AWS Elastic Beanstalk deployment instructions.
+- **[Quick EB Deployment](docs/EB_DEPLOYMENT.md)** - Clean, step-by-step EB deployment
+- **[Complete AWS Guide](docs/AWS_DEPLOYMENT_GUIDE.md)** - Full guide with RDS and domain setup
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ## ✨ Features
 

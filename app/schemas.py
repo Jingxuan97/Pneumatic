@@ -1,16 +1,16 @@
 # app/schemas.py
 from typing import List, Any, Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 class UserCreate(BaseModel):
     username: str
-    full_name: str | None = None
+    full_name: Optional[str] = None
     password: str
 
 class UserResponse(BaseModel):
     id: str
     username: str
-    full_name: str | None = None
+    full_name: Optional[str] = None
 
 class UserLogin(BaseModel):
     username: str

@@ -1,6 +1,8 @@
 # AWS Elastic Beanstalk Deployment Guide
 
 > **For a complete step-by-step guide including database and domain setup, see [AWS_DEPLOYMENT_GUIDE.md](AWS_DEPLOYMENT_GUIDE.md)**
+> **For a clean, quick deployment guide, see [EB_DEPLOYMENT.md](EB_DEPLOYMENT.md)**
+> **For troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
 
 ## Prerequisites
 

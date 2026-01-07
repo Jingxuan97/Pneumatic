@@ -49,7 +49,7 @@ You'll be prompted for:
 aws sts get-caller-identity
 ```
 
-This should return your AWS account information. If you get an error, see `FIX_AWS_CREDENTIALS.md` for troubleshooting.
+This should return your AWS account information. If you get an error, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for troubleshooting.
 
 ### Step 1.2.1: Set Up IAM Permissions
 
@@ -76,7 +76,7 @@ This should return your AWS account information. If you get an error, see `FIX_A
 
    Should return successfully (may be empty list if no apps exist).
 
-**If you get permission errors, see `FIX_IAM_PERMISSIONS.md` for detailed troubleshooting.**
+**If you get permission errors, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed troubleshooting.**
 
 ### Step 1.3: Install EB CLI
 

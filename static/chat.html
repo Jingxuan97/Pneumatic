@@ -262,6 +262,32 @@
             cursor: not-allowed;
         }
 
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 1000;
+        }
+
+        .connection-status.connected {
+            background: #4caf50;
+            color: white;
+        }
+
+        .connection-status.disconnected {
+            background: #f44336;
+            color: white;
+        }
+
+        .connection-status.connecting {
+            background: #ff9800;
+            color: white;
+        }
+
         .empty-state {
             flex: 1;
             display: flex;
@@ -378,9 +404,12 @@
         </div>
         <div class="input-area" id="inputArea" style="display: none;">
             <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+            <button class="send-btn" id="sendBtn" type="button" onclick="sendMessage()">Send</button>
         </div>
     </div>
+
+    <!-- Connection Status Indicator -->
+    <div class="connection-status" id="connectionStatus">Connecting...</div>
 
     <!-- New Group Chat Modal -->
     <div class="modal" id="newConversationModal">
@@ -400,6 +429,19 @@
         // Auto-detect API base URL (works in both dev and production)
         const API_BASE = window.location.origin;
         const WS_BASE = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host;
+
+        // Cross-browser UUID v4 generator (fallback for crypto.randomUUID)
+        function generateUUID() {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            // Fallback UUID v4 generator
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
 
         let accessToken = localStorage.getItem('accessToken');
         let userId = localStorage.getItem('userId');
@@ -819,24 +861,51 @@
         function displayMessages(messages) {
             const container = document.getElementById('messagesContainer');
             if (messages.length === 0) {
-                container.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+                // Only show empty state if container is truly empty
+                if (!container.querySelector('.message')) {
+                    container.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+                }
                 return;
             }
 
-            container.innerHTML = messages.map(msg => {
+            // Get existing message IDs to avoid duplicates
+            const existingMessageIds = new Set();
+            container.querySelectorAll('[data-message-id]').forEach(el => {
+                existingMessageIds.add(el.getAttribute('data-message-id'));
+            });
+
+            // Clear container but preserve structure
+            container.innerHTML = '';
+
+            // Add all messages
+            messages.forEach(msg => {
                 const isOwn = msg.sender_id === userId;
                 const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const senderName = getSenderName(msg.sender_id);
-                return `
-                    <div class="message ${isOwn ? 'own' : 'other'}">
-                        ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
-                        <div class="message-bubble">${msg.content}</div>
-                        <div class="message-time">${time}</div>
-                    </div>
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
+                messageDiv.setAttribute('data-message-id', msg.message_id);
+                messageDiv.innerHTML = `
+                    ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
+                    <div class="message-bubble">${msg.content}</div>
+                    <div class="message-time">${time}</div>
                 `;
-            }).join('');
+                container.appendChild(messageDiv);
+            });
 
             container.scrollTop = container.scrollHeight;
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = `connection-status ${status}`;
+            const statusText = {
+                'connected': '🟢 Connected',
+                'disconnected': '🔴 Disconnected',
+                'connecting': '🟡 Connecting...'
+            };
+            statusEl.textContent = statusText[status] || 'Unknown';
         }
 
         function connectWebSocket() {
@@ -844,11 +913,16 @@
                 return;
             }
 
+            updateConnectionStatus('connecting');
             ws = new WebSocket(`${WS_BASE}/ws?token=${accessToken}`);
 
             ws.onopen = () => {
                 console.log('WebSocket connected');
+                updateConnectionStatus('connected');
+                // Always join the current conversation when WebSocket opens
+                // This ensures we receive messages even after reconnection
                 if (currentConversationId) {
+                    console.log('Joining conversation on WebSocket connect:', currentConversationId);
                     ws.send(JSON.stringify({
                         type: 'join',
                         conversation_id: currentConversationId
@@ -857,54 +931,94 @@
             };
 
             ws.onmessage = async (event) => {
-                const data = JSON.parse(event.data);
+                try {
+                    console.log('WebSocket message received:', event.data);
+                    const data = JSON.parse(event.data);
+                    console.log('Parsed message data:', data);
 
-                if (data.type === 'message') {
-                    const msg = data.message;
-                    const convId = msg.conversation_id;
+                    if (data.type === 'message') {
+                        const msg = data.message;
+                        if (!msg) {
+                            console.error('Message data missing:', data);
+                            return;
+                        }
 
-                    // Check if this conversation exists in our local list
-                    const existingConv = conversations.find(c => c.id === convId);
+                        const convId = msg.conversation_id;
+                        console.log('Received message for conversation:', convId, 'Current conversation:', currentConversationId);
 
-                    // If conversation doesn't exist locally, reload conversations list and highlight it
-                    if (!existingConv) {
-                        await loadConversations(convId);
-                    }
+                        // Check if this conversation exists in our local list
+                        const existingConv = conversations.find(c => c.id === convId);
 
-                    // If this is the currently selected conversation, display the message
-                    if (convId === currentConversationId) {
-                        // Add message to display
-                        const container = document.getElementById('messagesContainer');
-                        const isOwn = msg.sender_id === userId;
-                        const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const senderName = getSenderName(msg.sender_id);
+                        // If conversation doesn't exist locally, reload conversations list and highlight it
+                        if (!existingConv) {
+                            console.log('Conversation not in local list, reloading...');
+                            await loadConversations(convId);
+                        }
 
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
-                        messageDiv.innerHTML = `
-                            ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
-                            <div class="message-bubble">${msg.content}</div>
-                            <div class="message-time">${time}</div>
-                        `;
-                        container.appendChild(messageDiv);
-                        container.scrollTop = container.scrollHeight;
+                        // If this is the currently selected conversation, display the message
+                        if (convId === currentConversationId) {
+                            console.log('Displaying message in current conversation');
+                            // Add message to display
+                            const container = document.getElementById('messagesContainer');
+                            if (!container) {
+                                console.error('Messages container not found!');
+                                return;
+                            }
+
+                            // Remove empty state if present
+                            const emptyState = container.querySelector('.empty-state');
+                            if (emptyState) {
+                                emptyState.remove();
+                            }
+
+                            const isOwn = msg.sender_id === userId;
+                            const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            const senderName = getSenderName(msg.sender_id);
+
+                            // Check if message already exists (prevent duplicates)
+                            const existingMessage = container.querySelector(`[data-message-id="${msg.message_id}"]`);
+                            if (existingMessage) {
+                                console.log('Message already displayed, skipping duplicate');
+                                return;
+                            }
+
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
+                            messageDiv.setAttribute('data-message-id', msg.message_id);
+                            messageDiv.innerHTML = `
+                                ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
+                                <div class="message-bubble">${msg.content}</div>
+                                <div class="message-time">${time}</div>
+                            `;
+                            container.appendChild(messageDiv);
+                            container.scrollTop = container.scrollHeight;
+                            console.log('Message displayed successfully:', msg.content);
+                        } else {
+                            console.log('Message for different conversation. Received convId:', convId, 'Current convId:', currentConversationId);
+                            // Message in a different conversation - reload conversations to show it in the list
+                            await loadConversations();
+                        }
+                    } else if (data.type === 'joined') {
+                        console.log('Joined conversation:', data.conversation_id);
+                    } else if (data.type === 'error') {
+                        console.error('WebSocket error:', data.reason);
+                        alert('Error: ' + data.reason);
                     } else {
-                        // Message in a different conversation - could add visual indicator here
-                        // For now, the conversation will appear in the list after reloadConversations
+                        console.log('Unknown message type:', data.type);
                     }
-                } else if (data.type === 'joined') {
-                    console.log('Joined conversation:', data.conversation_id);
-                } else if (data.type === 'error') {
-                    alert('Error: ' + data.reason);
+                } catch (error) {
+                    console.error('Error processing WebSocket message:', error, event.data);
                 }
             };
 
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
+                updateConnectionStatus('disconnected');
             };
 
             ws.onclose = (event) => {
                 console.log('WebSocket closed', event.code, event.reason);
+                updateConnectionStatus('disconnected');
                 // If closed due to authentication failure (403), redirect to login
                 if (event.code === 1008) { // Policy violation (authentication failed)
                     console.warn('WebSocket authentication failed, redirecting to login');
@@ -913,27 +1027,81 @@
                     return;
                 }
                 // Otherwise, reconnect after 3 seconds
+                updateConnectionStatus('connecting');
                 setTimeout(connectWebSocket, 3000);
             };
         }
 
         function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const content = input.value.trim();
+            console.log('sendMessage() called');
+            console.log('Current state:', {
+                currentConversationId,
+                wsExists: !!ws,
+                wsState: ws ? ws.readyState : 'N/A',
+                inputValue: document.getElementById('messageInput')?.value
+            });
 
-            if (!content || !currentConversationId || !ws || ws.readyState !== WebSocket.OPEN) {
+            const input = document.getElementById('messageInput');
+            if (!input) {
+                console.error('Message input element not found!');
+                alert('Input field not found. Please refresh the page.');
                 return;
             }
 
-            const messageId = crypto.randomUUID();
-            ws.send(JSON.stringify({
-                type: 'message',
-                message_id: messageId,
-                conversation_id: currentConversationId,
-                content: content
-            }));
+            const content = input.value.trim();
 
-            input.value = '';
+            // Validate message content
+            if (!content) {
+                console.warn('Cannot send empty message');
+                return;
+            }
+
+            // Validate conversation is selected
+            if (!currentConversationId) {
+                console.error('No conversation selected');
+                alert('Please select a conversation first');
+                return;
+            }
+
+            // Validate WebSocket connection
+            if (!ws) {
+                console.error('WebSocket not initialized');
+                alert('Connection error. Please refresh the page.');
+                return;
+            }
+
+            if (ws.readyState !== WebSocket.OPEN) {
+                console.error('WebSocket not connected. State:', ws.readyState);
+                const states = {
+                    0: 'CONNECTING',
+                    1: 'OPEN',
+                    2: 'CLOSING',
+                    3: 'CLOSED'
+                };
+                alert(`Not connected (State: ${states[ws.readyState] || ws.readyState}). Attempting to reconnect...`);
+                connectWebSocket();
+                return;
+            }
+
+            try {
+                const messageId = generateUUID();
+                const messageData = {
+                    type: 'message',
+                    message_id: messageId,
+                    conversation_id: currentConversationId,
+                    content: content
+                };
+
+                console.log('Sending message:', messageData);
+                ws.send(JSON.stringify(messageData));
+
+                // Clear input on successful send
+                input.value = '';
+                console.log('Message sent successfully');
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Failed to send message: ' + error.message);
+            }
         }
 
         function handleKeyPress(event) {

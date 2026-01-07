@@ -29,7 +29,13 @@ class RateLimiter:
         # Store request timestamps: key -> list of timestamps
         self.minute_buckets: Dict[str, list] = defaultdict(list)
         self.hour_buckets: Dict[str, list] = defaultdict(list)
-        self.lock = asyncio.Lock()
+        self._lock = None
+
+    def _get_lock(self):
+        """Lazy initialization of asyncio.Lock() - creates it when first needed in async context."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     def _get_key(self, request: Request, user_id: Optional[str] = None) -> str:
         """
@@ -63,7 +69,7 @@ class RateLimiter:
         Returns:
             Tuple of (is_allowed, error_message)
         """
-        async with self.lock:
+        async with self._get_lock():
             key = self._get_key(request, user_id)
             now = time.time()
 

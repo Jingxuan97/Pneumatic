@@ -1,5 +1,5 @@
 # app/routes.py
-from fastapi import APIRouter, HTTPException, status, Depends, Request
+from fastapi import APIRouter, HTTPException, status, Depends
 from .schemas import ConversationCreate, MessageCreate
 from .store_sql import store
 import asyncio
