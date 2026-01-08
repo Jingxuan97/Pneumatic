@@ -1,5 +1,6 @@
 # app/schemas.py
-from typing import List, Any, Optional
+"""Pydantic schemas for request/response validation."""
+from typing import List, Optional
 from pydantic import BaseModel
 
 class UserCreate(BaseModel):

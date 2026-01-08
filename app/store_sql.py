@@ -1,12 +1,11 @@
 # app/store_sql.py
+"""Async SQLAlchemy data access layer."""
 from typing import Dict, Any, List, Optional
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import AsyncSessionLocal
 from app.models import User, Conversation, ConversationMember, Message
 from datetime import datetime, timezone
-import asyncio
 
 class SQLStore:
     def __init__(self):

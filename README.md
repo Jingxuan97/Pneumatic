@@ -22,9 +22,7 @@ Server runs at: `http://localhost:8000`
 
 ### Production Deployment
 
-- **[Quick EB Deployment](docs/EB_DEPLOYMENT.md)** - Clean, step-by-step EB deployment
-- **[Complete AWS Guide](docs/AWS_DEPLOYMENT_GUIDE.md)** - Full guide with RDS and domain setup
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Complete AWS Elastic Beanstalk deployment guide
 
 ## ✨ Features
 
@@ -45,13 +43,10 @@ Server runs at: `http://localhost:8000`
 
 ## 📖 Documentation
 
-- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
-- **[User Guide](docs/USER_GUIDE.md)** - Complete feature documentation
-- **[Architecture](docs/ARCHITECTURE.md)** - Technical architecture overview
-- **[Authentication](docs/AUTHENTICATION.md)** - Auth implementation details
-- **[Complete AWS Deployment Guide](docs/AWS_DEPLOYMENT_GUIDE.md)** - Step-by-step deployment with database and domain setup
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Quick reference for AWS Elastic Beanstalk
-- **[Codebase Explanation](docs/CODEBASE_EXPLANATION.md)** - Code understanding guide
+- **[Quick Start](docs/QUICK_START.md)** - Get started in 5 minutes
+- **[Tutorial](docs/TUTORIAL.md)** - Complete feature guide and codebase overview
+- **[Deployment](docs/DEPLOYMENT.md)** - AWS Elastic Beanstalk deployment guide
+- **[Debug](docs/DEBUG.md)** - Troubleshooting common issues
 
 ## 🧪 Testing
 

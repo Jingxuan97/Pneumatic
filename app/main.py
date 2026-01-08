@@ -10,7 +10,7 @@ from .auth_routes import router as auth_router
 from .websockets import manager
 from .store_sql import store  # async SQL store
 from .schemas import MessageCreate
-from .db import DATABASE_URL, init_db, engine
+from .db import init_db, engine
 from .auth import get_current_user_websocket
 from .metrics import metrics
 from .logging_config import setup_logging
